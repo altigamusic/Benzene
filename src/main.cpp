@@ -414,7 +414,7 @@ static int window_init(WININFO* info)
     rec.bottom = RES_Y;
     AdjustWindowRect(&rec, dwStyle, 0);
 
-    info->hWnd = CreateWindowEx(dwExStyle, wc.lpszClassName, "Datalove", dwStyle,
+    info->hWnd = CreateWindowEx(dwExStyle, wc.lpszClassName, "Benzene", dwStyle,
         (GetSystemMetrics(SM_CXSCREEN) - rec.right + rec.left) >> 1, (GetSystemMetrics(SM_CYSCREEN) - rec.bottom + rec.top) >> 1,
         rec.right - rec.left, rec.bottom - rec.top, 0, 0, info->hInstance, 0);
     if (!info->hWnd) return 0;
