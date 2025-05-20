@@ -475,7 +475,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     {
         long currentTime = timeGetTime();
         long timeDelta = currentTime - prevTime;
-        if (tick) t = min(t + timeDelta, 15500);
+        if (tick) t += timeDelta;
         prevTime = currentTime;
 
         didCameraMove = false;
