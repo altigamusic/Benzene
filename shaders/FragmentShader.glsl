@@ -1,6 +1,6 @@
 uniform vec3 _cp, _ct;
 uniform float _t;
-uniform vec2 _res;
+
 out vec4 fragColor;
 
 void main() {
