@@ -5,8 +5,7 @@
 #define RES_Y 600
 
 #include <math.h>
-
-void loadFragmentShader(const char* fragmentShaderSource);
+#include <string>
 
 void initIntro(void);
 void introLoop(long time);
