@@ -17,6 +17,9 @@
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
 
+bool showDebugWindow = false;
+std::string debugError;
+
 void loadFragmentShader(const char* fragmentShaderSource)
 {
     int length;
@@ -32,7 +35,9 @@ void loadFragmentShader(const char* fragmentShaderSource)
 
     glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
 
-    if (length > 0) MessageBox(0, infoLog, "Result:", MB_OK | MB_ICONEXCLAMATION);
+    debugError = std::string(infoLog, length);
+
+    if (length > 0) showDebugWindow = true;
 
     timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
 
@@ -546,6 +551,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::SliderFloat("Movement Scale", &MOVEMENT_SCALE, 1, 10);
         ImGui::End();
+
+        if (showDebugWindow && ImGui::Begin("Shader Debug", &showDebugWindow))
+        {
+            ImGui::TextUnformatted(debugError.c_str());
+            ImGui::End();
+        }
 
         // If the render stopped just now, render to the back buffer
         if (prevShouldRerender && !shouldRerender)
