@@ -209,7 +209,8 @@ bool CameraController::didCameraMove() const
 
 void CameraController::displayImGuiWindow()
 {
-    ImGui::Begin("Camera");
+    ImGui::SeparatorText("Camera");
+    ImGui::BeginChild("Camera");
     ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", position.x, position.y, position.z);
     ImGui::Text("Camera Target: %.2f, %.2f, %.2f", target.x, target.y, target.z);
     ImGui::Text(
@@ -224,5 +225,5 @@ void CameraController::displayImGuiWindow()
     }
 
     ImGui::SliderFloat("Movement Scale", &movementScale, 1, 10);
-    ImGui::End();
+    ImGui::EndChild();
 }

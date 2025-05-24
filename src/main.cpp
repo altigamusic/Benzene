@@ -19,11 +19,27 @@
 #include "structs.h";
 #include <regex>
 
-int windowWidth = 800;
-int windowHeight = 600;
+int sidebarWidth;
+int sidebarHeight;
+int windowWidth = 1200;
+int windowHeight = 680;
+int viewportWidth = 800;
+int viewportHeight = 600;
+int timelineWidth;
+int timelineHeight = 200;
 CameraController cameraController;
 
-void resetResolution() { glViewport(0, 0, windowWidth, windowHeight); }
+void resizeWindow(int width, int height)
+{
+    windowWidth = width;
+    windowHeight = height;
+    sidebarWidth = windowWidth - viewportWidth;
+    sidebarHeight = viewportHeight;
+    timelineWidth = windowWidth;
+    timelineHeight = windowHeight - viewportHeight;
+
+    glViewport(sidebarWidth, timelineHeight, viewportWidth, viewportHeight);
+}
 
 bool showDebugWindow = false;
 std::string debugError;
@@ -136,6 +152,8 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
     timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
     resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
 
+    resizeWindow(windowWidth, windowHeight);
+
     for (Uniform& uniform : uniformList)
     {
         uniform.location = glGetUniformLocation(fragmentShaderProgram, uniform.name.c_str());
@@ -145,8 +163,6 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
             showDebugWindow = true;
         }*/
     }
-
-    resetResolution();
 
     glUseProgram(fragmentShaderProgram);
 }
@@ -243,9 +259,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
     if (uMsg == WM_SIZE)
     {
-        windowWidth = LOWORD(lParam);
-        windowHeight = HIWORD(lParam);
-        resetResolution();
+        resizeWindow(LOWORD(lParam), HIWORD(lParam));
         return 0;
     }
 
@@ -373,22 +387,14 @@ static bool window_init(WININFO* info)
 }
 #pragma endregion
 
-void drawFpsText(float frameDelta, float fps)
-{
-    std::ostringstream fpsText;
-    fpsText << "Frame delta: " << frameDelta << " ms (" << std::fixed << std::setprecision(1) << fps << " FPS)";
-
-    // Draw the text at the top-left corner
-    ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), IM_COL32(0, 0, 0, 255), fpsText.str().c_str());
-}
-
 bool renderAndUpdateUniforms()
 {
     if (uniformList.empty()) return false;
 
     bool didChange = false;
 
-    ImGui::Begin("Uniforms");
+    ImGui::SeparatorText("Uniforms");
+    ImGui::BeginChild("Uniforms", ImVec2(0, sidebarHeight / 2));
     for (Uniform& uniform : uniformList)
     {
         switch (uniform.type)
@@ -404,7 +410,7 @@ bool renderAndUpdateUniforms()
             break;
         }
     }
-    ImGui::End();
+    ImGui::EndChild();
 
     return didChange;
 }
@@ -471,7 +477,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         bool shouldRerender = tick;
 
-        ImGui::Begin("Timeline");
+        ImGui::SetNextWindowPos(ImVec2(0, viewportHeight), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
+
+        ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
         if (ImGui::SliderInt("Time", &t, 0, 140000))
         {
             shouldRerender = true;
@@ -481,19 +490,27 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::End();
 
+        // Sidebar
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(sidebarWidth, sidebarHeight), ImGuiCond_Always);
+
+        ImGui::Begin("Properties", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
         shouldRerender |= renderAndUpdateUniforms();
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
 
         int fpsT = currentTime - fpsStart;
-        drawFpsText(frames == 0 ? 0 : (fpsT / frames), fpsT == 0 ? 0 : frames * 1000.f / fpsT);
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetTextLineHeightWithSpacing() * 2);
+        ImGui::Text("Frame delta: %.3f ms (%.1f FPS)\n", frames == 0 ? 0 : ((float)fpsT / frames), fpsT == 0 ? 0 : frames * 1000.f / fpsT);
 
         if (fpsT > 2000)
         {
             fpsStart = currentTime;
             frames = 0;
         }
+
+        ImGui::End();
 
         if (currentTime - lastRerender > 2000)
         {
