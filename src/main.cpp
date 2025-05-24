@@ -17,6 +17,7 @@
 #include <windows.h>
 #include "CameraController.h";
 #include "structs.h";
+#include <regex>
 
 int windowWidth = 800;
 int windowHeight = 600;
@@ -33,9 +34,59 @@ static GLuint resolutionLocation = -1;
 std::string currentShader;
 std::vector<Uniform> uniformList;
 
-void initIntro() { uniformList.push_back(Uniform{"brightness", UniformType::Float, (GLuint)-1, 0.f}); }
+void initIntro() {}
 
-void loadFragmentShader(const char* fragmentShaderSource)
+std::vector<std::string> getUndeclaredIdentifiers(std::string debugError)
+{
+    std::regex undeclaredIdentifierRegex("Undeclared identifier:\\s*(\\w+)\\s*$", std::regex::icase);
+
+    std::vector<std::string> result;
+    std::smatch match;
+
+    std::string::const_iterator searchStart(debugError.cbegin());
+    while (std::regex_search(searchStart, debugError.cend(), match, undeclaredIdentifierRegex))
+    {
+        if (match.size() > 1)
+        {
+            result.push_back(match[1].str());
+        }
+        searchStart = match.suffix().first;
+    }
+
+    return result;
+}
+
+std::string generateUniformCode()
+{
+    std::stringstream uniformStream;
+    for (const Uniform& uniform : uniformList)
+    {
+        switch (uniform.type)
+        {
+        case UniformType::Float:
+            uniformStream << "uniform float " << uniform.name << ";\n";
+            break;
+        case UniformType::Int:
+            uniformStream << "uniform int " << uniform.name << ";\n";
+            break;
+        case UniformType::Bool:
+            uniformStream << "uniform bool " << uniform.name << ";\n";
+            break;
+        case UniformType::Vec2:
+            uniformStream << "uniform vec2 " << uniform.name << ";\n";
+            break;
+        case UniformType::Vec3:
+            uniformStream << "uniform vec3 " << uniform.name << ";\n";
+            break;
+        case UniformType::Vec4:
+            uniformStream << "uniform vec4 " << uniform.name << ";\n";
+            break;
+        }
+    }
+    return uniformStream.str();
+}
+
+void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting = false)
 {
     int length;
     char infoLog[500];
@@ -46,7 +97,14 @@ void loadFragmentShader(const char* fragmentShaderSource)
         fragmentShaderProgram = 0;
     }
 
-    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
+    std::string source =
+        "#version 330\n"
+        "uniform vec2 _res;\n"
+        "uniform float _t;\n" +
+        generateUniformCode() + fragmentShaderSource;
+
+    const char* srcPtr = source.c_str();
+    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &srcPtr);
 
     glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
 
@@ -54,6 +112,19 @@ void loadFragmentShader(const char* fragmentShaderSource)
 
     if (length > 0)
     {
+        if (!didTryInjecting)
+        {
+            auto undeclaredIdentifiers = getUndeclaredIdentifiers(debugError);
+
+            // Inject all undeclared identifiers as uniforms and recompile
+            for (const std::string& name : undeclaredIdentifiers)
+            {
+                uniformList.push_back(Uniform{name, UniformType::Float, (GLuint)-1, 0.f});
+            }
+
+            return loadFragmentShader(fragmentShaderSource, true);
+        }
+
         showDebugWindow = true;
         return;
     }
@@ -82,9 +153,6 @@ bool reloadFragmentShaderFromFile()
 
     std::ifstream fragmentShaderFile(fragmentShaderPath);
     std::stringstream stringStream;
-    stringStream << "#version 330\n"
-                 << "uniform vec2 _res;";
-
     stringStream << fragmentShaderFile.rdbuf();
 
     std::string s = stringStream.str();
