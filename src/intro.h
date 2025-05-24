@@ -1,9 +1,6 @@
 #ifndef _INTRO_H_
 #define _INTRO_H_
 
-#define RES_X 800
-#define RES_Y 600
-
 #include <math.h>
 #include <string>
 

@@ -12,13 +12,23 @@
 #include <sstream>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 #include <windows.h>
 
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
+static GLuint resolutionLocation = -1;
 
 bool showDebugWindow = false;
 std::string debugError;
+
+int windowWidth = 800;
+int windowHeight = 600;
+
+void resetResolution()
+{
+    glViewport(0, 0, windowWidth, windowHeight);
+}
 
 void loadFragmentShader(const char* fragmentShaderSource)
 {
@@ -37,20 +47,26 @@ void loadFragmentShader(const char* fragmentShaderSource)
 
     debugError = std::string(infoLog, length);
 
-    if (length > 0) showDebugWindow = true;
+    if (length > 0)
+    {
+        showDebugWindow = true;
+        return;
+    }
 
     timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
+    resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
+
+    resetResolution();
 
     glUseProgram(fragmentShaderProgram);
 }
-
-void initIntro() {}
 
 void introLoop(long timeInMs)
 {
     const float ftime = 0.001f * (float)timeInMs;
 
     glUniform1f(timeLocation, ftime);
+    glUniform2f(resolutionLocation, windowWidth, windowHeight);
 
     glRects(-1, -1, 1, 1);
 }
@@ -238,7 +254,7 @@ bool reloadFragmentShaderFromFile()
     std::ifstream fragmentShaderFile(fragmentShaderPath);
     std::stringstream stringStream;
     stringStream << "#version 330\n"
-                 << "const vec2 _res = vec2(" << RES_X << ", " << RES_Y << ");\n";
+                 << "uniform vec2 _res;";
 
     stringStream << fragmentShaderFile.rdbuf();
 
@@ -256,14 +272,24 @@ bool reloadFragmentShaderFromFile()
     return didChange;
 }
 
+void initIntro() {}
+
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam)) return true;
 
-    // salvapantallas
+    if (uMsg == WM_SIZE)
+    {
+        windowWidth = LOWORD(lParam);
+        windowHeight = HIWORD(lParam);
+        resetResolution();
+        return 0;
+    }
+
+    // Screensaver
     if (uMsg == WM_SYSCOMMAND && (wParam == SC_SCREENSAVE || wParam == SC_MONITORPOWER)) return 0;
 
-    // boton x o pulsacion de escape
+    // Close on close/esc button
     if (uMsg == WM_CLOSE || uMsg == WM_DESTROY)
     {
         PostQuitMessage(0);
@@ -400,8 +426,8 @@ static int window_init(WININFO* info)
         dmScreenSettings.dmSize = sizeof(DEVMODE);
         dmScreenSettings.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
         dmScreenSettings.dmBitsPerPel = 32;
-        dmScreenSettings.dmPelsWidth = RES_X;
-        dmScreenSettings.dmPelsHeight = RES_Y;
+        dmScreenSettings.dmPelsWidth = windowWidth;
+        dmScreenSettings.dmPelsHeight = windowHeight;
         if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) return 0;
         dwExStyle = WS_EX_APPWINDOW;
         dwStyle = WS_VISIBLE | WS_POPUP; // | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
@@ -410,13 +436,13 @@ static int window_init(WININFO* info)
     else
     {
         dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-        dwStyle = WS_VISIBLE | WS_CAPTION | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_SYSMENU;
+        dwStyle = WS_VISIBLE | WS_CAPTION | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_SYSMENU | WS_THICKFRAME;
     }
 
     rec.left = 0;
     rec.top = 0;
-    rec.right = RES_X;
-    rec.bottom = RES_Y;
+    rec.right = windowWidth;
+    rec.bottom = windowHeight;
     AdjustWindowRect(&rec, dwStyle, 0);
 
     info->hWnd = CreateWindowEx(dwExStyle, wc.lpszClassName, "Benzene", dwStyle,
@@ -458,7 +484,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     ImGui_ImplWin32_InitForOpenGL(info->hWnd);
     ImGui_ImplOpenGL3_Init();
 
-    EXT_Init();
+    if (!EXT_Init())
+    {
+        MessageBox(0, "An OpenGL function is missing.", "Error", MB_OK | MB_ICONEXCLAMATION);
+        return 0;
+    }
 
     initIntro();
     recalculateCameraTarget();
