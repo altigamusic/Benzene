@@ -128,6 +128,10 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
         showDebugWindow = true;
         return;
     }
+    else
+    {
+        showDebugWindow = false;
+    }
 
     timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
     resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
@@ -159,7 +163,7 @@ bool reloadFragmentShaderFromFile()
 
     bool didChange = s != currentShader;
 
-    if (didChange)
+    if (didChange && !s.empty())
     {
         loadFragmentShader(s.c_str());
     }
