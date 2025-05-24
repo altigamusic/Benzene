@@ -13,7 +13,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
+#include <iomanip>
 #include <windows.h>
+#include "CameraController.h";
 
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
@@ -25,10 +27,7 @@ std::string debugError;
 int windowWidth = 800;
 int windowHeight = 600;
 
-void resetResolution()
-{
-    glViewport(0, 0, windowWidth, windowHeight);
-}
+void resetResolution() { glViewport(0, 0, windowWidth, windowHeight); }
 
 void loadFragmentShader(const char* fragmentShaderSource)
 {
@@ -87,19 +86,6 @@ typedef struct
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-bool didCameraMove = false;
-float xAngle = 0;
-float yAngle = 0;
-vec3 cameraPos = {};
-vec3 cameraTarget = {};
-
-float cameraMovementX = 0, cameraMovementY = 0, cameraMovementZ = 0, cameraMovementToTarget = 0;
-
-float MOVEMENT_SCALE = 10;
-constexpr float ANGLE_SCALE = 0.003f;
-constexpr float PI = 3.141; // slightly smaller because of rounding reasons
-bool isCtrlDown = false;
-
 static const PIXELFORMATDESCRIPTOR pfd = {sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
     PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 8, 0, //
     0, 0, 0, 0, 0,                             // accum
@@ -112,138 +98,10 @@ static WININFO wininfo = {
     0, 0, 0, 0, 0, {'i', 'q', '_', 0}
 };
 
-void recalculateAnglesFromTarget()
-{
-    vec3 direction = cameraTarget - cameraPos;
+CameraController cameraController;
 
-    xAngle = -atan2f(direction.x, direction.z);
-
-    // Unrotate the XZ plane to get the correct YZ angle
-    float s = sinf(-xAngle), c = cosf(-xAngle);
-    yAngle = -atan2f(direction.y, direction.x * s + direction.z * c);
-}
-
-vec3 getCameraDirection()
-{
-    vec3 direction = {0, 0, 1};
-
-    float xS = sinf(xAngle), xC = cosf(xAngle), yS = sinf(yAngle), yC = cosf(yAngle);
-
-    // Rotate YZ plane by Y angle
-    // no matrix multiplication :(
-    direction = {direction.x, direction.y * yC - direction.z * yS, direction.y * yS + direction.z * yC};
-    // Rotate XZ plane by X angle
-    direction = {direction.x * xC - direction.z * xS, direction.y, direction.x * xS + direction.z * xC};
-
-    return direction;
-}
-
-void recalculateCameraTarget()
-{
-    vec3 direction = getCameraDirection();
-
-    cameraTarget = cameraPos + direction * 10;
-}
-
-void recalculateCameraPosition()
-{
-    vec3 direction = getCameraDirection();
-
-    cameraPos = cameraTarget - direction * 10;
-}
-
-static void handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    static POINTS start;
-    static float startXAngle;
-    static float startYAngle;
-
-    float xDiff, yDiff;
-
-    switch (uMsg)
-    {
-    case WM_LBUTTONDOWN:
-        SetCapture(hwndMain);
-        start = MAKEPOINTS(lParam);
-        startXAngle = xAngle;
-        startYAngle = yAngle;
-        break;
-    case WM_MOUSEMOVE:
-        if (!(wParam & MK_LBUTTON)) break;
-
-        didCameraMove = true;
-        POINTS currentPoint = MAKEPOINTS(lParam);
-
-        xDiff = (float)(currentPoint.x - start.x);
-        yDiff = (float)(currentPoint.y - start.y);
-
-        xAngle = startXAngle + xDiff * ANGLE_SCALE;
-        yAngle = startYAngle + yDiff * ANGLE_SCALE;
-
-        yAngle = min(yAngle, PI / 2);
-        yAngle = max(yAngle, -PI / 2);
-
-        // Orbit if ctrl is down
-        if (isCtrlDown)
-            recalculateCameraPosition();
-        else
-            recalculateCameraTarget();
-        break;
-
-    case WM_LBUTTONUP:
-        ClipCursor(NULL);
-        ReleaseCapture();
-        break;
-    }
-}
-
-void moveForward(float amount)
-{
-    vec3 direction = getCameraDirection();
-
-    // Cross up with direction to get left
-    vec3 left = vec3{0, 1, 0}.cross(direction).normalize();
-
-    // Cross left and up to get the forward
-    vec3 forward = left.cross(vec3{0, 1, 0});
-
-    cameraPos = cameraPos + (forward * amount);
-    cameraTarget = cameraPos + direction;
-}
-
-void moveToTarget(float amount)
-{
-    vec3 direction = getCameraDirection();
-
-    cameraPos = cameraPos + (direction * amount);
-    cameraTarget = cameraPos + direction;
-}
-
-void moveLeft(float amount)
-{
-    vec3 direction = getCameraDirection();
-
-    // Cross with up to get left
-    vec3 left = vec3{0, 1, 0}.cross(direction).normalize();
-
-    cameraPos = cameraPos + (left * amount);
-    cameraTarget = cameraPos + direction;
-}
-
-void moveUp(float amount)
-{
-    cameraPos.y += amount;
-    recalculateCameraTarget();
-}
-
-void updateCamera(long timeDeltaMs)
-{
-    float timeDelta = ((float)timeDeltaMs) / 1000.0f;
-    moveToTarget(cameraMovementToTarget * timeDelta);
-    moveLeft(cameraMovementX * timeDelta);
-    moveUp(cameraMovementY * timeDelta);
-    moveForward(cameraMovementZ * timeDelta);
-}
+float MOVEMENT_SCALE = 10;
+constexpr float ANGLE_SCALE = 0.003f;
 
 std::string currentShader;
 
@@ -316,70 +174,16 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
                 return 0;
             }
 
-            if (wParam == 'W')
-            {
-                cameraMovementToTarget = MOVEMENT_SCALE;
-            }
-            if (wParam == 'S')
-            {
-                cameraMovementToTarget = -MOVEMENT_SCALE;
-            }
-            if (wParam == 'A')
-            {
-                cameraMovementX = MOVEMENT_SCALE;
-            }
-            if (wParam == 'D')
-            {
-                cameraMovementX = -MOVEMENT_SCALE;
-            }
-            if (wParam == 'Q')
-            {
-                cameraMovementY = MOVEMENT_SCALE;
-            }
-            if (wParam == 'E')
-            {
-                cameraMovementY = -MOVEMENT_SCALE;
-            }
-            if (wParam == 'R')
-            {
-                cameraMovementZ = MOVEMENT_SCALE;
-            }
-            if (wParam == 'F')
-            {
-                cameraMovementZ = -MOVEMENT_SCALE;
-            }
-            if (wParam == VK_CONTROL)
-            {
-                isCtrlDown = true;
-            }
+            cameraController.handleKeyDown(wParam);
         }
 
         if (uMsg == WM_KEYUP)
         {
-            if (wParam == 'W' || wParam == 'S')
-            {
-                cameraMovementToTarget = 0;
-            }
-            if (wParam == 'A' || wParam == 'D')
-            {
-                cameraMovementX = 0;
-            }
-            if (wParam == 'Q' || wParam == 'E')
-            {
-                cameraMovementY = 0;
-            }
-            if (wParam == 'R' || wParam == 'F')
-            {
-                cameraMovementZ = 0;
-            }
-            if (wParam == VK_CONTROL)
-            {
-                isCtrlDown = false;
-            }
+            cameraController.handleKeyUp(wParam);
         }
     }
 
-    if (!wantCaptureMouse) handleMouseMovement(hWnd, uMsg, wParam, lParam);
+    if (!wantCaptureMouse) cameraController.handleMouseMovement(hWnd, uMsg, wParam, lParam);
 
     return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
@@ -463,6 +267,15 @@ static int window_init(WININFO* info)
     return 1;
 }
 
+void drawFpsText(float frameDelta, float fps)
+{
+    std::ostringstream fpsText;
+    fpsText << "Frame delta: " << frameDelta << " ms (" << std::fixed << std::setprecision(1) << fps << " FPS)";
+
+    // Draw the text at the top-left corner
+    ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), IM_COL32(0, 0, 0, 255), fpsText.str().c_str());
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
@@ -491,7 +304,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     }
 
     initIntro();
-    recalculateCameraTarget();
+    cameraController.recalculateCameraTarget();
 
     float s0 = 1, s1 = 1, s2 = 0, s3 = 0, s4 = 0, s5 = 0;
     int scene = 0;
@@ -513,7 +326,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (tick) t += timeDelta;
         prevTime = currentTime;
 
-        didCameraMove = false;
+        cameraController.resetCameraMovementCheck();
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
@@ -522,16 +335,14 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             DispatchMessage(&msg);
         }
 
-        didCameraMove |= cameraMovementX != 0 || cameraMovementY != 0 || cameraMovementZ != 0 || cameraMovementToTarget != 0;
-
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
         // Move camera by keyboard input
-        updateCamera(timeDelta);
+        cameraController.updateCamera(timeDelta);
 
-        bool shouldRerender = tick || didCameraMove;
+        bool shouldRerender = tick;
 
         ImGui::Begin("Intro Params");
 
@@ -549,14 +360,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         shouldRerender |= ImGui::DragFloat("s5", &s5, 0.01f);
         ImGui::End();
 
-        ImGui::Begin("Camera");
-        ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", cameraPos.x, cameraPos.y, cameraPos.z);
-        ImGui::Text("Camera Target: %.2f, %.2f, %.2f", cameraTarget.x, cameraTarget.y, cameraTarget.z);
-        ImGui::Text(
-            "Camera Direction: %.2f, %.2f, %.2f", cameraTarget.x - cameraPos.x, cameraTarget.y - cameraPos.y, cameraTarget.z - cameraPos.z);
+        cameraController.displayImGuiWindow();
+        shouldRerender |= cameraController.didCameraMove();
 
         int fpsT = currentTime - fpsStart;
-        ImGui::Text("Frame delta: %i ms (%.1f FPS)", frames == 0 ? 0 : (fpsT / frames), fpsT == 0 ? 0 : frames * 1000.f / fpsT);
+        drawFpsText(frames == 0 ? 0 : (fpsT / frames), fpsT == 0 ? 0 : frames * 1000.f / fpsT);
 
         if (fpsT > 2000)
         {
@@ -570,17 +378,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             // TODO: Maybe change the way this is done or something
             shouldRerender |= reloadFragmentShaderFromFile();
         }
-
-        if (ImGui::Button("Reset Camera"))
-        {
-            shouldRerender = true;
-            cameraPos = {0, 0, 10};
-            cameraTarget = {0, 0, 0};
-            recalculateAnglesFromTarget();
-        }
-
-        ImGui::SliderFloat("Movement Scale", &MOVEMENT_SCALE, 1, 10);
-        ImGui::End();
 
         if (showDebugWindow && ImGui::Begin("Shader Debug", &showDebugWindow))
         {
