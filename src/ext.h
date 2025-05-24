@@ -1,10 +1,5 @@
-//--------------------------------------------------------------------------//
-// iq / rgba  .  tiny codes  .  2008/2015                                   //
-//--------------------------------------------------------------------------//
-
-#ifndef _EXTENSIONS_H_
-#define _EXTENSIONS_H_
-
+#ifndef EXT_H
+#define EXT_H
 #ifdef WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #define WIN32_EXTRA_LEAN
@@ -13,20 +8,14 @@
 #include <GL/gl.h>
 #include "glext.h"
 
-#ifndef DEBUG
-#define NUMFUNCTIONS 4
-#else
-#define NUMFUNCTIONS 23
-#endif
+#define NUM_FUNCTIONS 27
 
-extern void* myglfunc[NUMFUNCTIONS];
+extern void* myglfunc[NUM_FUNCTIONS];
 
 #define glCreateShaderProgramv ((PFNGLCREATESHADERPROGRAMVPROC)myglfunc[0])
 #define glUseProgram ((PFNGLUSEPROGRAMPROC)myglfunc[1])
 #define glGetUniformLocation ((PFNGLGETUNIFORMLOCATIONPROC)myglfunc[2])
 #define glUniform1f ((PFNGLUNIFORM1FPROC)myglfunc[3])
-
-#ifdef DEBUG
 #define glGenProgramPipelines ((PFNGLGENPROGRAMPIPELINESPROC)myglfunc[4])
 #define glBindProgramPipeline ((PFNGLBINDPROGRAMPIPELINEPROC)myglfunc[5])
 #define glUseProgramStages ((PFNGLUSEPROGRAMSTAGESPROC)myglfunc[6])
@@ -46,13 +35,11 @@ extern void* myglfunc[NUMFUNCTIONS];
 #define glCheckFramebufferStatus ((PFNGLCHECKFRAMEBUFFERSTATUSPROC)myglfunc[20])
 #define glGetShaderiv ((PFNGLGETSHADERIVPROC)myglfunc[21])
 #define glGetShaderInfoLog ((PFNGLGETSHADERINFOLOGPROC)myglfunc[22])
-#endif
+#define glBlitFramebuffer ((PFNGLBLITFRAMEBUFFERPROC)myglfunc[23])
+#define glDeleteProgram ((PFNGLDELETEPROGRAMPROC)myglfunc[24])
+#define glUniform1i ((PFNGLUNIFORM1IPROC)myglfunc[25])
+#define glUniform2f ((PFNGLUNIFORM2FPROC)myglfunc[26])
 
-#define glUniform1i ((PFNGLUNIFORM1IPROC)wglGetProcAddress("glUniform1i"))
-#define glBlitFramebuffer ((PFNGLBLITFRAMEBUFFERPROC)wglGetProcAddress("glBlitFramebuffer"))
-#define glDeleteProgram ((PFNGLDELETEPROGRAMPROC)wglGetProcAddress("glDeleteProgram"))
-
-// init
 int EXT_Init(void);
 
 #endif

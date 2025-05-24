@@ -1,7 +1,3 @@
-//--------------------------------------------------------------------------//
-// iq / rgba  .  tiny codes  .  2008/2015                                   //
-//--------------------------------------------------------------------------//
-
 #ifdef WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #define WIN32_EXTRA_LEAN
@@ -9,20 +5,16 @@
 #endif
 #include <GL/gl.h>
 #include "glext.h"
+#include "ext.h"
 #ifdef LINUX
 #include <GL/glx.h>
 #endif
-
-//--- d a t a ---------------------------------------------------------------
-
-#include "ext.h"
 
 static char* strs[] = {
     "glCreateShaderProgramv",
     "glUseProgram",
     "glGetUniformLocation",
     "glUniform1f",
-#ifdef DEBUG
     "glGenProgramPipelines",
     "glBindProgramPipeline",
     "glUseProgramStages",
@@ -42,14 +34,17 @@ static char* strs[] = {
     "glCheckFramebufferStatus",
     "glGetShaderiv",
     "glGetShaderInfoLog",
-#endif
+    "glBlitFramebuffer",
+    "glDeleteProgram",
+    "glUniform1i",
+    "glUniform2f",
 };
 
-void* myglfunc[NUMFUNCTIONS];
+void* myglfunc[NUM_FUNCTIONS];
 
 int EXT_Init(void)
 {
-    for (int i = 0; i < NUMFUNCTIONS; i++)
+    for (int i = 0; i < NUM_FUNCTIONS; i++)
     {
 #ifdef WINDOWS
         myglfunc[i] = wglGetProcAddress(strs[i]);
@@ -57,7 +52,7 @@ int EXT_Init(void)
 #ifdef LINUX
         myglfunc[i] = glXGetProcAddress((const unsigned char*)strs[i]);
 #endif
-        if (!myglfunc[i]) return (0);
+        if (!myglfunc[i]) return 0;
     }
-    return (1);
+    return 1;
 }
