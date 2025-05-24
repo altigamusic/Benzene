@@ -17,59 +17,7 @@
 #include <windows.h>
 #include "CameraController.h";
 
-static GLuint fragmentShaderProgram = 0;
-static GLuint timeLocation;
-static GLuint resolutionLocation = -1;
-
-bool showDebugWindow = false;
-std::string debugError;
-
-int windowWidth = 800;
-int windowHeight = 600;
-
-void resetResolution() { glViewport(0, 0, windowWidth, windowHeight); }
-
-void loadFragmentShader(const char* fragmentShaderSource)
-{
-    int length;
-    char infoLog[500];
-
-    if (fragmentShaderProgram != 0)
-    {
-        glDeleteProgram(fragmentShaderProgram);
-        fragmentShaderProgram = 0;
-    }
-
-    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
-
-    glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
-
-    debugError = std::string(infoLog, length);
-
-    if (length > 0)
-    {
-        showDebugWindow = true;
-        return;
-    }
-
-    timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
-    resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
-
-    resetResolution();
-
-    glUseProgram(fragmentShaderProgram);
-}
-
-void introLoop(long timeInMs)
-{
-    const float ftime = 0.001f * (float)timeInMs;
-
-    glUniform1f(timeLocation, ftime);
-    glUniform2f(resolutionLocation, windowWidth, windowHeight);
-
-    glRects(-1, -1, 1, 1);
-}
-
+#pragma region Window and Rendering Boilerplate
 typedef struct
 {
     //---------------
@@ -97,40 +45,6 @@ static const PIXELFORMATDESCRIPTOR pfd = {sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_
 static WININFO wininfo = {
     0, 0, 0, 0, 0, {'i', 'q', '_', 0}
 };
-
-CameraController cameraController;
-
-float MOVEMENT_SCALE = 10;
-constexpr float ANGLE_SCALE = 0.003f;
-
-std::string currentShader;
-
-bool reloadFragmentShaderFromFile()
-{
-    const char* fragmentShaderPath = "shaders/FragmentShader.glsl";
-
-    std::ifstream fragmentShaderFile(fragmentShaderPath);
-    std::stringstream stringStream;
-    stringStream << "#version 330\n"
-                 << "uniform vec2 _res;";
-
-    stringStream << fragmentShaderFile.rdbuf();
-
-    std::string s = stringStream.str();
-
-    bool didChange = s != currentShader;
-
-    if (didChange)
-    {
-        loadFragmentShader(s.c_str());
-    }
-
-    currentShader = std::move(s);
-
-    return didChange;
-}
-
-void initIntro() {}
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -208,7 +122,7 @@ static void window_end(WININFO* info)
     }
 }
 
-static int window_init(WININFO* info)
+static bool window_init(WININFO* info)
 {
     unsigned int PixelFormat;
     DWORD dwExStyle, dwStyle;
@@ -223,7 +137,7 @@ static int window_init(WININFO* info)
     wc.hInstance = info->hInstance;
     wc.lpszClassName = info->wndclass;
 
-    if (!RegisterClass(&wc)) return 0;
+    if (!RegisterClass(&wc)) return false;
 
     if (info->full)
     {
@@ -232,7 +146,7 @@ static int window_init(WININFO* info)
         dmScreenSettings.dmBitsPerPel = 32;
         dmScreenSettings.dmPelsWidth = windowWidth;
         dmScreenSettings.dmPelsHeight = windowHeight;
-        if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) return 0;
+        if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) return false;
         dwExStyle = WS_EX_APPWINDOW;
         dwStyle = WS_VISIBLE | WS_POPUP; // | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
         ShowCursor(0);
@@ -252,19 +166,103 @@ static int window_init(WININFO* info)
     info->hWnd = CreateWindowEx(dwExStyle, wc.lpszClassName, "Benzene", dwStyle,
         (GetSystemMetrics(SM_CXSCREEN) - rec.right + rec.left) >> 1, (GetSystemMetrics(SM_CYSCREEN) - rec.bottom + rec.top) >> 1,
         rec.right - rec.left, rec.bottom - rec.top, 0, 0, info->hInstance, 0);
-    if (!info->hWnd) return 0;
+    if (!info->hWnd) return false;
 
-    if (!(info->hDC = GetDC(info->hWnd))) return 0;
+    if (!(info->hDC = GetDC(info->hWnd))) return false;
 
-    if (!(PixelFormat = ChoosePixelFormat(info->hDC, &pfd))) return 0;
+    if (!(PixelFormat = ChoosePixelFormat(info->hDC, &pfd))) return false;
 
-    if (!SetPixelFormat(info->hDC, PixelFormat, &pfd)) return 0;
+    if (!SetPixelFormat(info->hDC, PixelFormat, &pfd)) return false;
 
-    if (!(info->hRC = wglCreateContext(info->hDC))) return 0;
+    if (!(info->hRC = wglCreateContext(info->hDC))) return false;
 
-    if (!wglMakeCurrent(info->hDC, info->hRC)) return 0;
+    if (!wglMakeCurrent(info->hDC, info->hRC)) return false;
 
-    return 1;
+    return true;
+}
+#pragma endregion
+
+static GLuint fragmentShaderProgram = 0;
+static GLuint timeLocation;
+static GLuint resolutionLocation = -1;
+
+bool showDebugWindow = false;
+std::string debugError;
+
+CameraController cameraController;
+std::string currentShader;
+
+int windowWidth = 800;
+int windowHeight = 600;
+
+bool reloadFragmentShaderFromFile()
+{
+    const char* fragmentShaderPath = "shaders/FragmentShader.glsl";
+
+    std::ifstream fragmentShaderFile(fragmentShaderPath);
+    std::stringstream stringStream;
+    stringStream << "#version 330\n"
+                 << "uniform vec2 _res;";
+
+    stringStream << fragmentShaderFile.rdbuf();
+
+    std::string s = stringStream.str();
+
+    bool didChange = s != currentShader;
+
+    if (didChange)
+    {
+        loadFragmentShader(s.c_str());
+    }
+
+    currentShader = std::move(s);
+
+    return didChange;
+}
+
+void initIntro() {}
+
+void resetResolution() { glViewport(0, 0, windowWidth, windowHeight); }
+
+void loadFragmentShader(const char* fragmentShaderSource)
+{
+    int length;
+    char infoLog[500];
+
+    if (fragmentShaderProgram != 0)
+    {
+        glDeleteProgram(fragmentShaderProgram);
+        fragmentShaderProgram = 0;
+    }
+
+    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
+
+    glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
+
+    debugError = std::string(infoLog, length);
+
+    if (length > 0)
+    {
+        showDebugWindow = true;
+        return;
+    }
+
+    timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
+    resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
+
+    resetResolution();
+
+    glUseProgram(fragmentShaderProgram);
+}
+
+void introLoop(long timeInMs)
+{
+    const float ftime = 0.001f * (float)timeInMs;
+
+    glUniform1f(timeLocation, ftime);
+    glUniform2f(resolutionLocation, windowWidth, windowHeight);
+
+    glRects(-1, -1, 1, 1);
 }
 
 void drawFpsText(float frameDelta, float fps)
@@ -283,8 +281,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     WININFO* info = &wininfo;
 
     info->hInstance = GetModuleHandle(0);
-
-    // if( MessageBox( 0, "fullscreen?", info->wndclass, MB_YESNO|MB_ICONQUESTION)==IDYES ) info->full++;
 
     if (!window_init(info))
     {
