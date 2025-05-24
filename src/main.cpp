@@ -16,6 +16,125 @@
 #include <iomanip>
 #include <windows.h>
 #include "CameraController.h";
+#include "structs.h";
+
+int windowWidth = 800;
+int windowHeight = 600;
+CameraController cameraController;
+
+void resetResolution() { glViewport(0, 0, windowWidth, windowHeight); }
+
+bool showDebugWindow = false;
+std::string debugError;
+
+static GLuint fragmentShaderProgram = 0;
+static GLuint timeLocation;
+static GLuint resolutionLocation = -1;
+std::string currentShader;
+std::vector<Uniform> uniformList;
+
+void initIntro() { uniformList.push_back(Uniform{"brightness", UniformType::Float, (GLuint)-1, 0.f}); }
+
+void loadFragmentShader(const char* fragmentShaderSource)
+{
+    int length;
+    char infoLog[500];
+
+    if (fragmentShaderProgram != 0)
+    {
+        glDeleteProgram(fragmentShaderProgram);
+        fragmentShaderProgram = 0;
+    }
+
+    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
+
+    glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
+
+    debugError = std::string(infoLog, length);
+
+    if (length > 0)
+    {
+        showDebugWindow = true;
+        return;
+    }
+
+    timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
+    resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
+
+    for (Uniform& uniform : uniformList)
+    {
+        uniform.location = glGetUniformLocation(fragmentShaderProgram, uniform.name.c_str());
+        /*if (uniform.location == -1)
+        {
+            debugError = "Uniform '" + uniform.name + "' not found in shader!";
+            showDebugWindow = true;
+        }*/
+    }
+
+    resetResolution();
+
+    glUseProgram(fragmentShaderProgram);
+}
+
+bool reloadFragmentShaderFromFile()
+{
+    const char* fragmentShaderPath = "shaders/FragmentShader.glsl";
+
+    std::ifstream fragmentShaderFile(fragmentShaderPath);
+    std::stringstream stringStream;
+    stringStream << "#version 330\n"
+                 << "uniform vec2 _res;";
+
+    stringStream << fragmentShaderFile.rdbuf();
+
+    std::string s = stringStream.str();
+
+    bool didChange = s != currentShader;
+
+    if (didChange)
+    {
+        loadFragmentShader(s.c_str());
+    }
+
+    currentShader = std::move(s);
+
+    return didChange;
+}
+
+void introLoop(long timeInMs)
+{
+    const float ftime = 0.001f * (float)timeInMs;
+
+    glUniform1f(timeLocation, ftime);
+    glUniform2f(resolutionLocation, windowWidth, windowHeight);
+
+    for (Uniform& uniform : uniformList)
+    {
+        switch (uniform.type)
+        {
+        case UniformType::Float:
+            glUniform1f(uniform.location, uniform.value.f);
+            break;
+        case UniformType::Int:
+            glUniform1i(uniform.location, uniform.value.i);
+            break;
+        case UniformType::Bool:
+            glUniform1i(uniform.location, uniform.value.b ? 1 : 0);
+            break;
+        case UniformType::Vec2:
+            glUniform2f(uniform.location, uniform.value.v2[0], uniform.value.v2[1]);
+            break;
+        case UniformType::Vec3:
+            glUniform3f(uniform.location, uniform.value.v3[0], uniform.value.v3[1], uniform.value.v3[2]);
+            break;
+        case UniformType::Vec4:
+            glUniform4f(uniform.location, uniform.value.v4[0], uniform.value.v4[1], uniform.value.v4[2], uniform.value.v4[3]);
+            break;
+        }
+    }
+
+    glRects(-1, -1, 1, 1);
+}
 
 #pragma region Window and Rendering Boilerplate
 typedef struct
@@ -182,89 +301,6 @@ static bool window_init(WININFO* info)
 }
 #pragma endregion
 
-static GLuint fragmentShaderProgram = 0;
-static GLuint timeLocation;
-static GLuint resolutionLocation = -1;
-
-bool showDebugWindow = false;
-std::string debugError;
-
-CameraController cameraController;
-std::string currentShader;
-
-int windowWidth = 800;
-int windowHeight = 600;
-
-bool reloadFragmentShaderFromFile()
-{
-    const char* fragmentShaderPath = "shaders/FragmentShader.glsl";
-
-    std::ifstream fragmentShaderFile(fragmentShaderPath);
-    std::stringstream stringStream;
-    stringStream << "#version 330\n"
-                 << "uniform vec2 _res;";
-
-    stringStream << fragmentShaderFile.rdbuf();
-
-    std::string s = stringStream.str();
-
-    bool didChange = s != currentShader;
-
-    if (didChange)
-    {
-        loadFragmentShader(s.c_str());
-    }
-
-    currentShader = std::move(s);
-
-    return didChange;
-}
-
-void initIntro() {}
-
-void resetResolution() { glViewport(0, 0, windowWidth, windowHeight); }
-
-void loadFragmentShader(const char* fragmentShaderSource)
-{
-    int length;
-    char infoLog[500];
-
-    if (fragmentShaderProgram != 0)
-    {
-        glDeleteProgram(fragmentShaderProgram);
-        fragmentShaderProgram = 0;
-    }
-
-    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
-
-    glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
-
-    debugError = std::string(infoLog, length);
-
-    if (length > 0)
-    {
-        showDebugWindow = true;
-        return;
-    }
-
-    timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
-    resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
-
-    resetResolution();
-
-    glUseProgram(fragmentShaderProgram);
-}
-
-void introLoop(long timeInMs)
-{
-    const float ftime = 0.001f * (float)timeInMs;
-
-    glUniform1f(timeLocation, ftime);
-    glUniform2f(resolutionLocation, windowWidth, windowHeight);
-
-    glRects(-1, -1, 1, 1);
-}
-
 void drawFpsText(float frameDelta, float fps)
 {
     std::ostringstream fpsText;
@@ -272,6 +308,33 @@ void drawFpsText(float frameDelta, float fps)
 
     // Draw the text at the top-left corner
     ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), IM_COL32(0, 0, 0, 255), fpsText.str().c_str());
+}
+
+bool renderAndUpdateUniforms()
+{
+    if (uniformList.empty()) return false;
+
+    bool didChange = false;
+
+    ImGui::Begin("Uniforms");
+    for (Uniform& uniform : uniformList)
+    {
+        switch (uniform.type)
+        {
+        case UniformType::Float:
+            didChange |= ImGui::DragFloat(uniform.name.c_str(), &uniform.value.f, 0.005f);
+            break;
+        case UniformType::Int:
+            didChange |= ImGui::DragInt(uniform.name.c_str(), &uniform.value.i, 0.005f);
+            break;
+        case UniformType::Bool:
+            didChange |= ImGui::Checkbox(uniform.name.c_str(), &uniform.value.b);
+            break;
+        }
+    }
+    ImGui::End();
+
+    return didChange;
 }
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -301,10 +364,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
     initIntro();
     cameraController.recalculateCameraTarget();
-
-    float s0 = 1, s1 = 1, s2 = 0, s3 = 0, s4 = 0, s5 = 0;
-    int scene = 0;
-    bool overrideControl = false;
 
     long prevTime = timeGetTime();
     int t = 0;
@@ -340,21 +399,17 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         bool shouldRerender = tick;
 
-        ImGui::Begin("Intro Params");
-
+        ImGui::Begin("Timeline");
         if (ImGui::SliderInt("Time", &t, 0, 140000))
         {
             shouldRerender = true;
             frames = -1;
         }
         shouldRerender |= ImGui::Checkbox("Play/Pause", &tick);
-        shouldRerender |= ImGui::SliderFloat("s0", &s0, 0, 1);
-        shouldRerender |= ImGui::SliderFloat("s1", &s1, 0, 1);
-        shouldRerender |= ImGui::SliderFloat("s2", &s2, 0, 1);
-        shouldRerender |= ImGui::SliderFloat("s3", &s3, 0, 1);
-        shouldRerender |= ImGui::DragFloat("s4", &s4, 0.01f);
-        shouldRerender |= ImGui::DragFloat("s5", &s5, 0.01f);
+
         ImGui::End();
+
+        shouldRerender |= renderAndUpdateUniforms();
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();

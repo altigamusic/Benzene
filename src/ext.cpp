@@ -14,7 +14,6 @@ static char* strs[] = {
     "glCreateShaderProgramv",
     "glUseProgram",
     "glGetUniformLocation",
-    "glUniform1f",
     "glGenProgramPipelines",
     "glBindProgramPipeline",
     "glUseProgramStages",
@@ -37,7 +36,10 @@ static char* strs[] = {
     "glBlitFramebuffer",
     "glDeleteProgram",
     "glUniform1i",
+    "glUniform1f",
     "glUniform2f",
+    "glUniform3f",
+    "glUniform4f",
 };
 
 void* myglfunc[NUM_FUNCTIONS];

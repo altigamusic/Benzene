@@ -41,6 +41,7 @@
     <ClInclude Include="src\imgui\imstb_textedit.h" />
     <ClInclude Include="src\imgui\imstb_truetype.h" />
     <ClInclude Include="src\intro.h" />
+    <ClInclude Include="src\structs.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\imgui\imgui.natstepfilter" />
