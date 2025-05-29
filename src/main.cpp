@@ -28,6 +28,7 @@ int viewportHeight = 600;
 int timelineWidth;
 int timelineHeight = 200;
 CameraController cameraController;
+const char* uniformFileName = "uniforms.txt";
 
 void resizeWindow(int width, int height)
 {
@@ -100,6 +101,44 @@ std::string generateUniformCode()
         }
     }
     return uniformStream.str();
+}
+
+void saveUniformsToFile(const std::string& filename)
+{
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        debugError = "Failed to open file for saving uniforms: " + filename;
+        showDebugWindow = true;
+        return;
+    }
+    for (const Uniform& uniform : uniformList)
+    {
+        switch (uniform.type)
+        {
+        case UniformType::Float:
+            file << uniform.name << ";float;" << std::fixed << std::setprecision(6) << uniform.value.f << "\n";
+            break;
+        case UniformType::Int:
+            file << uniform.name << ";int;" << uniform.value.i << "\n";
+            break;
+        case UniformType::Bool:
+            file << uniform.name << ";bool;" << (uniform.value.b ? "true" : "false") << "\n";
+            break;
+        case UniformType::Vec2:
+            file << uniform.name << ";vec2;" << std::fixed << std::setprecision(6) << uniform.value.v2[0] << "," << uniform.value.v2[1]
+                 << "\n";
+            break;
+        case UniformType::Vec3:
+            file << uniform.name << ";vec3;" << uniform.value.v3[0] << "," << uniform.value.v3[1] << "," << uniform.value.v3[2] << "\n";
+            break;
+        case UniformType::Vec4:
+            file << uniform.name << ";vec4;" << uniform.value.v4[0] << "," << uniform.value.v4[1] << "," << uniform.value.v4[2] << ","
+                 << uniform.value.v4[3] << "\n";
+            break;
+        }
+    }
+    file.close();
 }
 
 void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting = false)
@@ -415,10 +454,95 @@ bool renderAndUpdateUniforms()
     return didChange;
 }
 
+void loadUniformsFromFile(const std::string& filename)
+{
+    std::ifstream file(filename);
+    if (!file.is_open())
+    {
+        // The uniform file is optional
+        return;
+    }
+
+    uniformList.clear();
+    std::string line;
+    while (std::getline(file, line))
+    {
+        std::stringstream ss(line);
+        std::string name, type, valueStr;
+        bool loadError = false;
+
+        if (std::getline(ss, name, ';') && std::getline(ss, type, ';') && std::getline(ss, valueStr))
+        {
+            Uniform uniform;
+            uniform.name = name;
+
+            try
+            {
+                if (type == "float")
+                {
+                    uniform.type = UniformType::Float;
+                    uniform.value.f = std::stof(valueStr);
+                }
+                else if (type == "int")
+                {
+                    uniform.type = UniformType::Int;
+                    uniform.value.i = std::stoi(valueStr);
+                }
+                else if(type == "bool")
+                {
+                    uniform.type = UniformType::Bool;
+                    uniform.value.b = (valueStr == "true");
+                    loadError = valueStr != "false" && valueStr != "true";
+                }
+                else if (type == "vec2")
+                {
+                    uniform.type = UniformType::Vec2;
+                    loadError = sscanf(valueStr.c_str(), "(%f,%f)", &uniform.value.v2[0], &uniform.value.v2[1]) != 2;
+                }
+                else if (type == "vec3")
+                {
+                    uniform.type = UniformType::Vec3;
+                    loadError =
+                        sscanf(valueStr.c_str(), "(%f,%f,%f)", &uniform.value.v3[0], &uniform.value.v3[1], &uniform.value.v3[2]) != 3;
+                }
+                else if (type == "vec4")
+                {
+                    uniform.type = UniformType::Vec4;
+                    loadError = sscanf(valueStr.c_str(), "(%f,%f,%f,%f)", &uniform.value.v4[0], &uniform.value.v4[1], &uniform.value.v4[2],
+                                    &uniform.value.v4[3]) != 4;
+                }
+                else
+                {
+                    loadError = true;
+                }
+            }
+            catch (const std::invalid_argument&)
+            {
+                loadError = true;
+            }
+            catch (const std::out_of_range&)
+            {
+                loadError = true;
+            }
+
+            if (loadError)
+            {
+                debugError = "Corrupt uniform file, ignoring";
+                showDebugWindow = true;
+                return;
+            }
+
+            uniform.location = -1;
+            uniformList.push_back(uniform);
+        }
+    }
+    file.close();
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
-    int done = 0;
+    bool done = false;
     WININFO* info = &wininfo;
 
     info->hInstance = GetModuleHandle(0);
@@ -442,6 +566,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
     initIntro();
     cameraController.recalculateCameraTarget();
+    loadUniformsFromFile(uniformFileName);
 
     long prevTime = timeGetTime();
     int t = 0;
@@ -463,7 +588,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
-            if (msg.message == WM_QUIT) done = 1;
+            if (msg.message == WM_QUIT) done = true;
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
@@ -549,6 +674,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+
+    saveUniformsToFile(uniformFileName);
 
     sndPlaySound(0, 0);
     window_end(info);
