@@ -8,7 +8,8 @@ enum class UniformType
     Vec3,
     Vec4,
     Int,
-    Bool
+    Bool,
+    Color
 };
 
 union UniformValue

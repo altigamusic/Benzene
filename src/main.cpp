@@ -93,6 +93,7 @@ std::string generateUniformCode()
             uniformStream << "uniform vec2 " << uniform.name << ";\n";
             break;
         case UniformType::Vec3:
+        case UniformType::Color:
             uniformStream << "uniform vec3 " << uniform.name << ";\n";
             break;
         case UniformType::Vec4:
@@ -131,6 +132,9 @@ void saveUniformsToFile(const std::string& filename)
             break;
         case UniformType::Vec3:
             file << uniform.name << ";vec3;" << uniform.value.v3[0] << "," << uniform.value.v3[1] << "," << uniform.value.v3[2] << "\n";
+            break;
+        case UniformType::Color:
+            file << uniform.name << ";color;" << uniform.value.v3[0] << "," << uniform.value.v3[1] << "," << uniform.value.v3[2] << "\n";
             break;
         case UniformType::Vec4:
             file << uniform.name << ";vec4;" << uniform.value.v4[0] << "," << uniform.value.v4[1] << "," << uniform.value.v4[2] << ","
@@ -252,6 +256,7 @@ void introLoop(long timeInMs)
             glUniform2f(uniform.location, uniform.value.v2[0], uniform.value.v2[1]);
             break;
         case UniformType::Vec3:
+        case UniformType::Color:
             glUniform3f(uniform.location, uniform.value.v3[0], uniform.value.v3[1], uniform.value.v3[2]);
             break;
         case UniformType::Vec4:
@@ -447,6 +452,9 @@ bool renderAndUpdateUniforms()
         case UniformType::Bool:
             didChange |= ImGui::Checkbox(uniform.name.c_str(), &uniform.value.b);
             break;
+        case UniformType::Color:
+            didChange |= ImGui::ColorPicker3(uniform.name.c_str(), uniform.value.v3);
+            break;
         }
     }
     ImGui::EndChild();
@@ -456,6 +464,8 @@ bool renderAndUpdateUniforms()
 
 void loadUniformsFromFile(const std::string& filename)
 {
+    uniformList.clear();
+
     std::ifstream file(filename);
     if (!file.is_open())
     {
@@ -463,8 +473,8 @@ void loadUniformsFromFile(const std::string& filename)
         return;
     }
 
-    uniformList.clear();
     std::string line;
+
     while (std::getline(file, line))
     {
         std::stringstream ss(line);
@@ -497,18 +507,18 @@ void loadUniformsFromFile(const std::string& filename)
                 else if (type == "vec2")
                 {
                     uniform.type = UniformType::Vec2;
-                    loadError = sscanf(valueStr.c_str(), "(%f,%f)", &uniform.value.v2[0], &uniform.value.v2[1]) != 2;
+                    loadError = sscanf(valueStr.c_str(), "%f,%f", &uniform.value.v2[0], &uniform.value.v2[1]) != 2;
                 }
-                else if (type == "vec3")
+                else if (type == "vec3" || type == "color")
                 {
-                    uniform.type = UniformType::Vec3;
+                    uniform.type = type == "vec3" ? UniformType::Vec3 : UniformType::Color;
                     loadError =
-                        sscanf(valueStr.c_str(), "(%f,%f,%f)", &uniform.value.v3[0], &uniform.value.v3[1], &uniform.value.v3[2]) != 3;
+                        sscanf(valueStr.c_str(), "%f,%f,%f", &uniform.value.v3[0], &uniform.value.v3[1], &uniform.value.v3[2]) != 3;
                 }
                 else if (type == "vec4")
                 {
                     uniform.type = UniformType::Vec4;
-                    loadError = sscanf(valueStr.c_str(), "(%f,%f,%f,%f)", &uniform.value.v4[0], &uniform.value.v4[1], &uniform.value.v4[2],
+                    loadError = sscanf(valueStr.c_str(), "%f,%f,%f,%f", &uniform.value.v4[0], &uniform.value.v4[1], &uniform.value.v4[2],
                                     &uniform.value.v4[3]) != 4;
                 }
                 else
@@ -529,6 +539,7 @@ void loadUniformsFromFile(const std::string& filename)
             {
                 debugError = "Corrupt uniform file, ignoring";
                 showDebugWindow = true;
+                uniformList.clear();
                 return;
             }
 
