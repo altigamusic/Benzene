@@ -617,12 +617,18 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        if (ImGui::SliderInt("Time", &t, 0, 140000))
+        if (ImGui::SliderInt("##", &t, 0, 140000))
         {
             shouldRerender = true;
             frames = -1;
         }
-        shouldRerender |= ImGui::Checkbox("Play/Pause", &tick);
+        ImGui::SameLine();
+
+        if (ImGui::Button(tick ? "Pause" : "Play"))
+        {
+            tick = !tick;
+            shouldRerender = true;
+        }
 
         ImGui::End();
 
