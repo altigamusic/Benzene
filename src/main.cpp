@@ -30,6 +30,8 @@ int timelineHeight = 200;
 CameraController cameraController;
 const char* uniformFileName = "uniforms.txt";
 
+bool showDemoWindow;
+
 void resizeWindow(int width, int height)
 {
     windowWidth = width;
@@ -336,6 +338,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
                 PostQuitMessage(0);
                 return 0;
             }
+            else if (wParam == VK_F1)
+            {
+                showDemoWindow = true;
+            }
 
             cameraController.handleKeyDown(wParam);
         }
@@ -607,6 +613,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+
+        if (showDemoWindow)
+            ImGui::ShowDemoWindow(&showDemoWindow);
 
         // Move camera by keyboard input
         cameraController.updateCamera(timeDelta);
