@@ -5,7 +5,6 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_impl_win32.h"
 #include "intro.h"
-#include <GL/gl.h>
 #include <fstream>
 #include <math.h>
 #include <mmsystem.h>
@@ -16,7 +15,7 @@
 #include <iomanip>
 #include <windows.h>
 #include "CameraController.h";
-#include "structs.h";
+#include "uniform.h";
 #include <regex>
 
 int sidebarWidth;
@@ -112,7 +111,7 @@ std::string generateUniformCode()
 
 void saveUniformsToFile(const std::string& filename)
 {
-    std::ofstream file(filename);
+    /*std::ofstream file(filename);
     if (!file.is_open())
     {
         debugError = "Failed to open file for saving uniforms: " + filename;
@@ -148,7 +147,7 @@ void saveUniformsToFile(const std::string& filename)
             break;
         }
     }
-    file.close();
+    file.close();*/
 }
 
 void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting = false)
@@ -184,7 +183,7 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
             // Inject all undeclared identifiers as uniforms and recompile
             for (const std::string& name : undeclaredIdentifiers)
             {
-                uniformList.push_back(Uniform{name, UniformType::Float, (GLuint)-1, 0.f});
+                uniformList.push_back(Uniform(name, UniformType::Float));
             }
 
             return loadFragmentShader(fragmentShaderSource, true);
@@ -243,30 +242,32 @@ void introLoop(long timeInMs)
     const float ftime = 0.001f * (float)timeInMs;
 
     glUniform1f(timeLocation, ftime);
-    glUniform2f(resolutionLocation, windowWidth, windowHeight);
+    glUniform2f(resolutionLocation, viewportWidth, viewportHeight);
 
     for (Uniform& uniform : uniformList)
     {
+        auto value = uniform.valueAtTime(timeInMs);
+
         switch (uniform.type)
         {
         case UniformType::Float:
-            glUniform1f(uniform.location, uniform.value.f);
+            glUniform1f(uniform.location, value.f);
             break;
         case UniformType::Int:
-            glUniform1i(uniform.location, uniform.value.i);
+            glUniform1i(uniform.location, value.i);
             break;
         case UniformType::Bool:
-            glUniform1i(uniform.location, uniform.value.b ? 1 : 0);
+            glUniform1i(uniform.location, value.b ? 1 : 0);
             break;
         case UniformType::Vec2:
-            glUniform2f(uniform.location, uniform.value.v2[0], uniform.value.v2[1]);
+            glUniform2f(uniform.location, value.v2[0], value.v2[1]);
             break;
         case UniformType::Vec3:
         case UniformType::Color:
-            glUniform3f(uniform.location, uniform.value.v3[0], uniform.value.v3[1], uniform.value.v3[2]);
+            glUniform3f(uniform.location, value.v3[0], value.v3[1], value.v3[2]);
             break;
         case UniformType::Vec4:
-            glUniform4f(uniform.location, uniform.value.v4[0], uniform.value.v4[1], uniform.value.v4[2], uniform.value.v4[3]);
+            glUniform4f(uniform.location, value.v4[0], value.v4[1], value.v4[2], value.v4[3]);
             break;
         }
     }
@@ -448,7 +449,7 @@ static bool window_init(WININFO* info)
 }
 #pragma endregion
 
-bool renderAndUpdateUniforms()
+bool renderAndUpdateUniforms(float time)
 {
     if (uniformList.empty()) return false;
 
@@ -458,20 +459,28 @@ bool renderAndUpdateUniforms()
     ImGui::BeginChild("Uniforms", ImVec2(0, sidebarHeight / 2));
     for (Uniform& uniform : uniformList)
     {
+        UniformValue value = uniform.valueAtTime(time);
+
         switch (uniform.type)
         {
         case UniformType::Float:
-            didChange |= ImGui::DragFloat(uniform.name.c_str(), &uniform.value.f, 0.005f);
+            didChange = ImGui::DragFloat(uniform.name.c_str(), &value.f, 0.005f);
             break;
         case UniformType::Int:
-            didChange |= ImGui::DragInt(uniform.name.c_str(), &uniform.value.i, 0.005f);
+            didChange = ImGui::DragInt(uniform.name.c_str(), &value.i, 0.005f);
             break;
         case UniformType::Bool:
-            didChange |= ImGui::Checkbox(uniform.name.c_str(), &uniform.value.b);
+            didChange = ImGui::Checkbox(uniform.name.c_str(), &value.b);
             break;
         case UniformType::Color:
-            didChange |= ImGui::ColorPicker3(uniform.name.c_str(), uniform.value.v3);
+            didChange = ImGui::ColorPicker3(uniform.name.c_str(), value.v3);
             break;
+        }
+
+        // If the uniform changed, add a keyframe at the current time
+        if (didChange)
+        {
+            uniform.setKeyframeAtTime(time, value);
         }
     }
     ImGui::EndChild();
@@ -481,90 +490,90 @@ bool renderAndUpdateUniforms()
 
 void loadUniformsFromFile(const std::string& filename)
 {
-    uniformList.clear();
+    //uniformList.clear();
 
-    std::ifstream file(filename);
-    if (!file.is_open())
-    {
-        // The uniform file is optional
-        return;
-    }
+    //std::ifstream file(filename);
+    //if (!file.is_open())
+    //{
+    //    // The uniform file is optional
+    //    return;
+    //}
 
-    std::string line;
+    //std::string line;
 
-    while (std::getline(file, line))
-    {
-        std::stringstream ss(line);
-        std::string name, type, valueStr;
-        bool loadError = false;
+    //while (std::getline(file, line))
+    //{
+    //    std::stringstream ss(line);
+    //    std::string name, type, valueStr;
+    //    bool loadError = false;
 
-        if (std::getline(ss, name, ';') && std::getline(ss, type, ';') && std::getline(ss, valueStr))
-        {
-            Uniform uniform;
-            uniform.name = name;
+    //    if (std::getline(ss, name, ';') && std::getline(ss, type, ';') && std::getline(ss, valueStr))
+    //    {
+    //        Uniform uniform;
+    //        uniform.name = name;
 
-            try
-            {
-                if (type == "float")
-                {
-                    uniform.type = UniformType::Float;
-                    uniform.value.f = std::stof(valueStr);
-                }
-                else if (type == "int")
-                {
-                    uniform.type = UniformType::Int;
-                    uniform.value.i = std::stoi(valueStr);
-                }
-                else if(type == "bool")
-                {
-                    uniform.type = UniformType::Bool;
-                    uniform.value.b = (valueStr == "true");
-                    loadError = valueStr != "false" && valueStr != "true";
-                }
-                else if (type == "vec2")
-                {
-                    uniform.type = UniformType::Vec2;
-                    loadError = sscanf(valueStr.c_str(), "%f,%f", &uniform.value.v2[0], &uniform.value.v2[1]) != 2;
-                }
-                else if (type == "vec3" || type == "color")
-                {
-                    uniform.type = type == "vec3" ? UniformType::Vec3 : UniformType::Color;
-                    loadError =
-                        sscanf(valueStr.c_str(), "%f,%f,%f", &uniform.value.v3[0], &uniform.value.v3[1], &uniform.value.v3[2]) != 3;
-                }
-                else if (type == "vec4")
-                {
-                    uniform.type = UniformType::Vec4;
-                    loadError = sscanf(valueStr.c_str(), "%f,%f,%f,%f", &uniform.value.v4[0], &uniform.value.v4[1], &uniform.value.v4[2],
-                                    &uniform.value.v4[3]) != 4;
-                }
-                else
-                {
-                    loadError = true;
-                }
-            }
-            catch (const std::invalid_argument&)
-            {
-                loadError = true;
-            }
-            catch (const std::out_of_range&)
-            {
-                loadError = true;
-            }
+    //        try
+    //        {
+    //            if (type == "float")
+    //            {
+    //                uniform.type = UniformType::Float;
+    //                uniform.value.f = std::stof(valueStr);
+    //            }
+    //            else if (type == "int")
+    //            {
+    //                uniform.type = UniformType::Int;
+    //                uniform.value.i = std::stoi(valueStr);
+    //            }
+    //            else if(type == "bool")
+    //            {
+    //                uniform.type = UniformType::Bool;
+    //                uniform.value.b = (valueStr == "true");
+    //                loadError = valueStr != "false" && valueStr != "true";
+    //            }
+    //            else if (type == "vec2")
+    //            {
+    //                uniform.type = UniformType::Vec2;
+    //                loadError = sscanf(valueStr.c_str(), "%f,%f", &uniform.value.v2[0], &uniform.value.v2[1]) != 2;
+    //            }
+    //            else if (type == "vec3" || type == "color")
+    //            {
+    //                uniform.type = type == "vec3" ? UniformType::Vec3 : UniformType::Color;
+    //                loadError =
+    //                    sscanf(valueStr.c_str(), "%f,%f,%f", &uniform.value.v3[0], &uniform.value.v3[1], &uniform.value.v3[2]) != 3;
+    //            }
+    //            else if (type == "vec4")
+    //            {
+    //                uniform.type = UniformType::Vec4;
+    //                loadError = sscanf(valueStr.c_str(), "%f,%f,%f,%f", &uniform.value.v4[0], &uniform.value.v4[1], &uniform.value.v4[2],
+    //                                &uniform.value.v4[3]) != 4;
+    //            }
+    //            else
+    //            {
+    //                loadError = true;
+    //            }
+    //        }
+    //        catch (const std::invalid_argument&)
+    //        {
+    //            loadError = true;
+    //        }
+    //        catch (const std::out_of_range&)
+    //        {
+    //            loadError = true;
+    //        }
 
-            if (loadError)
-            {
-                debugError = "Corrupt uniform file, ignoring";
-                showDebugWindow = true;
-                uniformList.clear();
-                return;
-            }
+    //        if (loadError)
+    //        {
+    //            debugError = "Corrupt uniform file, ignoring";
+    //            showDebugWindow = true;
+    //            uniformList.clear();
+    //            return;
+    //        }
 
-            uniform.location = -1;
-            uniformList.push_back(uniform);
-        }
-    }
-    file.close();
+    //        uniform.location = -1;
+    //        uniformList.push_back(uniform);
+    //    }
+    //}
+    //file.close();
 }
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -657,7 +666,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextWindowSize(ImVec2(sidebarWidth, sidebarHeight), ImGuiCond_Always);
 
         ImGui::Begin("Properties", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        shouldRerender |= renderAndUpdateUniforms();
+        shouldRerender |= renderAndUpdateUniforms(t);
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();

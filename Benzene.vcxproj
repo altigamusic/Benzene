@@ -26,6 +26,7 @@
     <ClCompile Include="src\main_win_rel.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="src\uniform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\CameraController.h" />
@@ -41,7 +42,7 @@
     <ClInclude Include="src\imgui\imstb_textedit.h" />
     <ClInclude Include="src\imgui\imstb_truetype.h" />
     <ClInclude Include="src\intro.h" />
-    <ClInclude Include="src\structs.h" />
+    <ClInclude Include="src\uniform.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\imgui\imgui.natstepfilter" />
