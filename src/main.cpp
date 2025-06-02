@@ -47,6 +47,9 @@ void resizeWindow(int width, int height)
 bool showDebugWindow = false;
 std::string debugError;
 
+bool isPlaying = true;
+bool isSpaceDown;
+
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
 static GLuint resolutionLocation = -1;
@@ -343,12 +346,19 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             {
                 showDemoWindow = true;
             }
+            else if (wParam == VK_SPACE && !isSpaceDown)
+            {
+                // Prevent holding space from retriggering a bunch of times
+                isSpaceDown = true;
+                isPlaying = !isPlaying;
+            }
 
             cameraController.handleKeyDown(wParam);
         }
 
         if (uMsg == WM_KEYUP)
         {
+            if (wParam == VK_SPACE) isSpaceDown = false;
             cameraController.handleKeyUp(wParam);
         }
     }
@@ -592,14 +602,13 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     int lastRerender = -1;
     int frames = 0;
 
-    bool tick = true;
     bool prevShouldRerender = false;
 
     while (!done)
     {
         long currentTime = timeGetTime();
         long timeDelta = currentTime - prevTime;
-        if (tick) t += timeDelta;
+        if (isPlaying) t += timeDelta;
         prevTime = currentTime;
 
         cameraController.resetCameraMovementCheck();
@@ -621,7 +630,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         // Move camera by keyboard input
         cameraController.updateCamera(timeDelta);
 
-        bool shouldRerender = tick;
+        bool shouldRerender = isPlaying;
 
         ImGui::SetNextWindowPos(ImVec2(0, viewportHeight), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
@@ -634,11 +643,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         }
         ImGui::SameLine();
 
-        if (ImGui::Button(tick ? "Pause" : "Play"))
+        if (ImGui::Button(isPlaying ? "Pause" : "Play"))
         {
-            tick = !tick;
+            isPlaying = !isPlaying;
             shouldRerender = true;
         }
+        ImGui::SetItemTooltip("Space");
 
         ImGui::End();
 
