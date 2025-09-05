@@ -455,42 +455,45 @@ bool renderAndUpdateUniforms(float time)
 {
     if (uniformList.empty()) return false;
 
-    bool didChange = false;
+    bool didAnythingChange = false;
 
     ImGui::SeparatorText("Uniforms");
     ImGui::BeginChild("Uniforms", ImVec2(0, sidebarHeight / 2));
+
     for (Uniform& uniform : uniformList)
     {
         UniformValue value = uniform.valueAtTime(time);
+        bool didThisUniformChange = false;
 
         switch (uniform.type)
         {
         case UniformType::Float:
-            didChange = ImGui::DragFloat(uniform.name.c_str(), &value.f, 0.005f);
+            didThisUniformChange = ImGui::DragFloat(uniform.name.c_str(), &value.f, 0.005f);
             break;
         case UniformType::Int:
-            didChange = ImGui::DragInt(uniform.name.c_str(), &value.i, 0.005f);
+            didThisUniformChange = ImGui::DragInt(uniform.name.c_str(), &value.i, 0.005f);
             break;
         case UniformType::Bool:
-            didChange = ImGui::Checkbox(uniform.name.c_str(), &value.b);
+            didThisUniformChange = ImGui::Checkbox(uniform.name.c_str(), &value.b);
             break;
         case UniformType::Vec2:
-            didChange = DragVector2(uniform.name.c_str(), (ImVec2*)(&value.v2), 0.005f);
+            didThisUniformChange = DragVector2(uniform.name.c_str(), (ImVec2*)(&value.v2), 0.005f);
             break;
         case UniformType::Color:
-            didChange = ImGui::ColorPicker3(uniform.name.c_str(), value.v3);
+            didThisUniformChange = ImGui::ColorPicker3(uniform.name.c_str(), value.v3);
             break;
         }
 
         // If the uniform changed, add a keyframe at the current time
-        if (didChange)
+        if (didThisUniformChange)
         {
             uniform.setKeyframeAtTime(time, value);
+            didAnythingChange = true;
         }
     }
     ImGui::EndChild();
 
-    return didChange;
+    return didAnythingChange;
 }
 
 void loadUniformsFromFile(const std::string& filename)
