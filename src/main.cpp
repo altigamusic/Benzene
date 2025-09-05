@@ -17,6 +17,7 @@
 #include "CameraController.h";
 #include "uniform.h";
 #include <regex>
+#include "imgui/imgui_benzene_widgets.h"
 
 int sidebarWidth;
 int sidebarHeight;
@@ -59,7 +60,8 @@ void initIntro() {}
 
 std::vector<std::string> getUndeclaredIdentifiers(std::string debugError)
 {
-    std::regex undeclaredIdentifierRegex("Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared identifier", std::regex::icase);
+    std::regex undeclaredIdentifierRegex(
+        "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared identifier", std::regex::icase);
 
     std::vector<std::string> result;
     std::smatch match;
@@ -472,6 +474,9 @@ bool renderAndUpdateUniforms(float time)
         case UniformType::Bool:
             didChange = ImGui::Checkbox(uniform.name.c_str(), &value.b);
             break;
+        case UniformType::Vec2:
+            didChange = DragVector2(uniform.name.c_str(), (ImVec2*)(&value.v2), 0.005f);
+            break;
         case UniformType::Color:
             didChange = ImGui::ColorPicker3(uniform.name.c_str(), value.v3);
             break;
@@ -631,8 +636,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        if (showDemoWindow)
-            ImGui::ShowDemoWindow(&showDemoWindow);
+        if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
 
         // Move camera by keyboard input
         cameraController.updateCamera(timeDelta);

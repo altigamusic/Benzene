@@ -14,6 +14,7 @@
     <ClCompile Include="src\CameraController.cpp" />
     <ClCompile Include="src\ext.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
+    <ClCompile Include="src\imgui\imgui_benzene_widgets.cpp" />
     <ClCompile Include="src\imgui\imgui_demo.cpp" />
     <ClCompile Include="src\imgui\imgui_draw.cpp" />
     <ClCompile Include="src\imgui\imgui_impl_opengl3.cpp" />
@@ -34,6 +35,7 @@
     <ClInclude Include="src\glext.h" />
     <ClInclude Include="src\imgui\imconfig.h" />
     <ClInclude Include="src\imgui\imgui.h" />
+    <ClInclude Include="src\imgui\imgui_benzene_widgets.h" />
     <ClInclude Include="src\imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="src\imgui\imgui_impl_opengl3_loader.h" />
     <ClInclude Include="src\imgui\imgui_impl_win32.h" />
