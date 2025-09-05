@@ -45,6 +45,10 @@ float gain(float x, float factor)
 
 float tonemap(float x, float factor) { return x * (factor + 1.0) / (1.0 + factor * x); }
 
+Uniform::Uniform(const std::string& name, UniformType type) : name(name), type(type), location((GLuint)-1) {}
+
+Uniform::Uniform(const std::string& name) : Uniform(name, UniformType::Untyped) {}
+
 UniformValue Uniform::valueAtTime(float time)
 {
     if (keyframes.empty()) return getDefault(type);
@@ -109,4 +113,10 @@ void Uniform::setKeyframeAtTime(float time, const UniformValue& value, KeyframeI
     }
 
     keyframes.insert(it, keyframe);
+}
+
+void Uniform::setConstantValue(const UniformValue& value) 
+{
+    keyframes.clear();
+    setKeyframeAtTime(0.0f, value, KeyframeInterpolation::Step, 0.0f);
 }

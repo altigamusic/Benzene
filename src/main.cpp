@@ -490,90 +490,88 @@ bool renderAndUpdateUniforms(float time)
 
 void loadUniformsFromFile(const std::string& filename)
 {
-    //uniformList.clear();
+    uniformList.clear();
 
-    //std::ifstream file(filename);
-    //if (!file.is_open())
-    //{
-    //    // The uniform file is optional
-    //    return;
-    //}
+    std::ifstream file(filename);
+    if (!file.is_open())
+    {
+        // The uniform file is optional
+        return;
+    }
 
-    //std::string line;
+    std::string line;
 
-    //while (std::getline(file, line))
-    //{
-    //    std::stringstream ss(line);
-    //    std::string name, type, valueStr;
-    //    bool loadError = false;
+    while (std::getline(file, line))
+    {
+        std::stringstream ss(line);
+        std::string name, type, valueStr;
+        bool loadError = false;
 
-    //    if (std::getline(ss, name, ';') && std::getline(ss, type, ';') && std::getline(ss, valueStr))
-    //    {
-    //        Uniform uniform;
-    //        uniform.name = name;
+        if (std::getline(ss, name, ';') && std::getline(ss, type, ';') && std::getline(ss, valueStr))
+        {
+            Uniform uniform(name);
+            UniformValue value;
 
-    //        try
-    //        {
-    //            if (type == "float")
-    //            {
-    //                uniform.type = UniformType::Float;
-    //                uniform.value.f = std::stof(valueStr);
-    //            }
-    //            else if (type == "int")
-    //            {
-    //                uniform.type = UniformType::Int;
-    //                uniform.value.i = std::stoi(valueStr);
-    //            }
-    //            else if(type == "bool")
-    //            {
-    //                uniform.type = UniformType::Bool;
-    //                uniform.value.b = (valueStr == "true");
-    //                loadError = valueStr != "false" && valueStr != "true";
-    //            }
-    //            else if (type == "vec2")
-    //            {
-    //                uniform.type = UniformType::Vec2;
-    //                loadError = sscanf(valueStr.c_str(), "%f,%f", &uniform.value.v2[0], &uniform.value.v2[1]) != 2;
-    //            }
-    //            else if (type == "vec3" || type == "color")
-    //            {
-    //                uniform.type = type == "vec3" ? UniformType::Vec3 : UniformType::Color;
-    //                loadError =
-    //                    sscanf(valueStr.c_str(), "%f,%f,%f", &uniform.value.v3[0], &uniform.value.v3[1], &uniform.value.v3[2]) != 3;
-    //            }
-    //            else if (type == "vec4")
-    //            {
-    //                uniform.type = UniformType::Vec4;
-    //                loadError = sscanf(valueStr.c_str(), "%f,%f,%f,%f", &uniform.value.v4[0], &uniform.value.v4[1], &uniform.value.v4[2],
-    //                                &uniform.value.v4[3]) != 4;
-    //            }
-    //            else
-    //            {
-    //                loadError = true;
-    //            }
-    //        }
-    //        catch (const std::invalid_argument&)
-    //        {
-    //            loadError = true;
-    //        }
-    //        catch (const std::out_of_range&)
-    //        {
-    //            loadError = true;
-    //        }
+            try
+            {
+                if (type == "float")
+                {
+                    uniform.type = UniformType::Float;
+                    value.f = std::stof(valueStr);
+                }
+                else if (type == "int")
+                {
+                    uniform.type = UniformType::Int;
+                    value.i = std::stoi(valueStr);
+                }
+                else if (type == "bool")
+                {
+                    uniform.type = UniformType::Bool;
+                    value.b = (valueStr == "true");
+                    loadError = valueStr != "false" && valueStr != "true";
+                }
+                else if (type == "vec2")
+                {
+                    uniform.type = UniformType::Vec2;
+                    loadError = sscanf(valueStr.c_str(), "%f,%f", &value.v2[0], &value.v2[1]) != 2;
+                }
+                else if (type == "vec3" || type == "color")
+                {
+                    uniform.type = type == "vec3" ? UniformType::Vec3 : UniformType::Color;
+                    loadError = sscanf(valueStr.c_str(), "%f,%f,%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
+                }
+                else if (type == "vec4")
+                {
+                    uniform.type = UniformType::Vec4;
+                    loadError = sscanf(valueStr.c_str(), "%f,%f,%f,%f", &value.v4[0], &value.v4[1], &value.v4[2], &value.v4[3]) != 4;
+                }
+                else
+                {
+                    loadError = true;
+                }
+            }
+            catch (const std::invalid_argument&)
+            {
+                loadError = true;
+            }
+            catch (const std::out_of_range&)
+            {
+                loadError = true;
+            }
 
-    //        if (loadError)
-    //        {
-    //            debugError = "Corrupt uniform file, ignoring";
-    //            showDebugWindow = true;
-    //            uniformList.clear();
-    //            return;
-    //        }
+            if (loadError || uniform.type == UniformType::Untyped)
+            {
+                debugError = "Corrupt uniform file, ignoring";
+                showDebugWindow = true;
+                uniformList.clear();
+                return;
+            }
 
-    //        uniform.location = -1;
-    //        uniformList.push_back(uniform);
-    //    }
-    //}
-    //file.close();
+            uniform.setConstantValue(value);
+            uniformList.push_back(uniform);
+        }
+    }
+    file.close();
 }
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
