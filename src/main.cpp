@@ -582,6 +582,43 @@ void loadUniformsFromFile(const std::string& filename)
     file.close();
 }
 
+std::vector<int> getAllKeyframes()
+{
+    std::vector<int> keyframes;
+
+    for (const Uniform& uniform : uniformList)
+    {
+        for (const UniformKeyframe& keyframe : uniform.keyframes)
+        {
+            int time = static_cast<int>(keyframe.time);
+            if (std::find(keyframes.begin(), keyframes.end(), time) == keyframes.end())
+            {
+                keyframes.push_back(time);
+            }
+        }
+    }
+
+    std::sort(keyframes.begin(), keyframes.end());
+
+    return keyframes;
+}
+
+bool renderTimelines(int* time, int maxTime) {
+    bool didChange = false;
+
+    for (const Uniform& uniform : uniformList)
+    {
+        std::vector<int> keyframes;
+
+        for (const UniformKeyframe& keyframe : uniform.keyframes)
+            keyframes.push_back(static_cast<int>(keyframe.time));
+
+        didChange |= KeyframeSlider(uniform.name.c_str(), time, 0, maxTime, keyframes);
+    }
+
+    return didChange;
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
@@ -650,10 +687,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        if (ImGui::SliderInt("##", &t, 0, 140000))
+
+        if (renderTimelines(&t, 140000))
         {
             shouldRerender = true;
             frames = -1;
+            isPlaying = false; // Pause when scrubbing
         }
         ImGui::SameLine();
 
