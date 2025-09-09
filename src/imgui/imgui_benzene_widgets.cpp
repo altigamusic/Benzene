@@ -208,3 +208,48 @@ bool TimeSlider(const char* label, int* data, int min, int max)
 
     return value_changed;
 }
+
+bool KeyframeMarker(const char* label, bool* data)
+{
+    const ImU32 KEYFRAME_OUTLINE_COLOR = GetColorU32(ImGuiCol_SliderGrabActive);
+    const ImU32 KEYFRAME_INACTIVE_COLOR = GetColorU32(ImGuiCol_FrameBg);
+    const ImU32 KEYFRAME_HOVERED_COLOR = GetColorU32(ImGuiCol_FrameBgHovered);
+    const ImU32 KEYFRAME_ACTIVE_COLOR = IM_COL32(0, 200, 0, 255);
+    const float KEYFRAME_RADIUS = 6;
+
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems) return false;
+
+    ImGuiContext& g = *GImGui;
+    ImGuiID id = window->GetID(label);
+
+    // Calculate bounding box for the button
+    ImVec2 pos = window->DC.CursorPos;
+    float size = GetFrameHeight();
+    ImRect bb = ImRect(pos.x, pos.y, pos.x + size, pos.y + size);
+
+    ItemSize(bb, g.Style.FramePadding.y);
+    if (!ItemAdd(bb, id)) return false;
+
+    bool hovered, held;
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held);
+
+    if (pressed)
+    {
+        *data = !*data;
+        MarkItemEdited(id);
+    }
+
+    // Render button
+    ImVec2 center = bb.GetCenter();
+    ImVec2 rhombus_points[4] = {center + ImVec2(-KEYFRAME_RADIUS, 0), center + ImVec2(0, -KEYFRAME_RADIUS),
+        center + ImVec2(KEYFRAME_RADIUS, 0), center + ImVec2(0, KEYFRAME_RADIUS)};
+
+    ImDrawList* draw_list = GetWindowDrawList();
+
+    auto color = *data ? KEYFRAME_ACTIVE_COLOR : (hovered ? KEYFRAME_HOVERED_COLOR : KEYFRAME_INACTIVE_COLOR);
+    draw_list->AddConvexPolyFilled(rhombus_points, 4, color);
+    draw_list->AddPolyline(rhombus_points, 4, KEYFRAME_OUTLINE_COLOR, ImDrawFlags_Closed, 1.);
+
+    return pressed;
+}

@@ -464,6 +464,7 @@ bool renderAndUpdateUniforms(float time)
     {
         UniformValue value = uniform.valueAtTime(time);
         bool didThisUniformChange = false;
+        bool hasKeyframeAtCurrentTime = uniform.hasKeyframeAtTime(time);
 
         switch (uniform.type)
         {
@@ -484,13 +485,26 @@ bool renderAndUpdateUniforms(float time)
             break;
         }
 
-        // If the uniform changed, add a keyframe at the current time
-        if (didThisUniformChange)
+        ImGui::SameLine();
+
+        bool shouldHaveKeyframeAtCurrentTime = hasKeyframeAtCurrentTime;
+
+        KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime);
+
+        // If the uniform changed (or the keyframe button was clicked), add a keyframe at the current time
+        if (didThisUniformChange || (shouldHaveKeyframeAtCurrentTime && !hasKeyframeAtCurrentTime))
         {
             uniform.setKeyframeAtTime(time, value);
             didAnythingChange = true;
         }
+        else if (!shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime)
+        {
+            // Remove the keyframe at the current time
+            uniform.removeKeyframeAtTime(time);
+            didAnythingChange = true;
+        }
     }
+
     ImGui::EndChild();
 
     return didAnythingChange;

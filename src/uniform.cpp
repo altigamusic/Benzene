@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <gl/GL.h>
 #include "uniform.h"
+#include <algorithm>
 
 UniformValue getDefault(UniformType type)
 {
@@ -150,6 +151,25 @@ UniformValue Uniform::valueAtTime(float time)
         }
 
         keyframes.insert(it, keyframe);
+    }
+
+    bool Uniform::hasKeyframeAtTime(float time)
+    {
+        return std::any_of(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+    }
+
+    bool Uniform::removeKeyframeAtTime(float time)
+    {
+        auto it = std::remove_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+
+        bool found = it != keyframes.end();
+
+        if (found)
+        {
+            keyframes.erase(it, keyframes.end());
+        }
+
+        return found;
     }
 
     void Uniform::setConstantValue(const UniformValue& value)
