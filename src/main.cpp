@@ -603,8 +603,11 @@ std::vector<int> getAllKeyframes()
     return keyframes;
 }
 
-bool renderTimelines(int* time, int maxTime) {
+bool renderTimelines(int* time, int maxTime)
+{
     bool didChange = false;
+
+    didChange |= TimeSlider("Time", time, 0, maxTime);
 
     for (const Uniform& uniform : uniformList)
     {
@@ -688,19 +691,19 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
+        if (ImGui::Button(isPlaying ? "Pause" : "Play"))
+        {
+            isPlaying = !isPlaying;
+            shouldRerender = true;
+        }
+
         if (renderTimelines(&t, 140000))
         {
             shouldRerender = true;
             frames = -1;
             isPlaying = false; // Pause when scrubbing
         }
-        ImGui::SameLine();
 
-        if (ImGui::Button(isPlaying ? "Pause" : "Play"))
-        {
-            isPlaying = !isPlaying;
-            shouldRerender = true;
-        }
         ImGui::SetItemTooltip("Space");
 
         ImGui::End();
@@ -710,7 +713,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextWindowSize(ImVec2(sidebarWidth, sidebarHeight), ImGuiCond_Always);
 
         ImGui::Begin("Properties", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
-        shouldRerender |= renderAndUpdateUniforms(t);
+        if (renderAndUpdateUniforms(t))
+        {
+            shouldRerender = true;
+            isPlaying = false; // Pause when changing a uniform
+        }
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
