@@ -21,11 +21,12 @@ bool DragVector2(
     // Calculate bounding box for the invisible button
     ImVec2 label_size = CalcTextSize(label, nullptr, true);
     ImVec2 pos = window->DC.CursorPos;
-    ImVec2 size = ImVec2(CalcItemWidth(), label_size.y + g.Style.FramePadding.y * 2.0f);
+    ImVec2 size = ImVec2(CalcItemWidth(), label_size.y);
+    ImVec2 fullSize = size + ImVec2(g.Style.ItemInnerSpacing.x + label_size.x, g.Style.FramePadding.y * 2.0f);
 
     bool value_changed = false;
 
-    if (!InvisibleButton(label, size) && IsItemActive() && IsMouseDragging(ImGuiMouseButton_Left))
+    if (!InvisibleButton(label, fullSize) && IsItemActive() && IsMouseDragging(ImGuiMouseButton_Left))
     {
         ImVec2 mouse_delta = GetIO().MouseDelta;
         ImVec2 v_old = *v;
