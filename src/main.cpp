@@ -22,7 +22,7 @@
 int sidebarWidth;
 int sidebarHeight;
 int windowWidth = 1200;
-int windowHeight = 680;
+int windowHeight = 800;
 int viewportWidth = 800;
 int viewportHeight = 600;
 int timelineWidth;
