@@ -464,7 +464,7 @@ bool renderAndUpdateUniforms(float time)
     {
         UniformValue value = uniform.valueAtTime(time);
         bool didThisUniformChange = false;
-        bool hasKeyframeAtCurrentTime = uniform.hasKeyframeAtTime(time);
+        UniformKeyframe* keyframeAtCurrentTime = uniform.getKeyframeAtTime(time);
 
         switch (uniform.type)
         {
@@ -487,17 +487,22 @@ bool renderAndUpdateUniforms(float time)
 
         ImGui::SameLine();
 
+        bool hasKeyframeAtCurrentTime = keyframeAtCurrentTime != nullptr;
         bool shouldHaveKeyframeAtCurrentTime = hasKeyframeAtCurrentTime;
+        KeyframeInterpolation interpolation =
+            hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolation : KeyframeInterpolation::Linear;
+        float tension =
+            hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
 
-        KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime);
+        bool didChange = KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension);
 
-        // If the uniform changed (or the keyframe button was clicked), add a keyframe at the current time
-        if (didThisUniformChange || (shouldHaveKeyframeAtCurrentTime && !hasKeyframeAtCurrentTime))
+        // If the uniform changed (or the keyframe button/interpolation was clicked), set a keyframe at the current time
+        if (didThisUniformChange || (didChange && shouldHaveKeyframeAtCurrentTime))
         {
-            uniform.setKeyframeAtTime(time, value);
+            uniform.setKeyframeAtTime(time, value, interpolation, tension);
             didAnythingChange = true;
         }
-        else if (!shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime)
+        else if (didChange && !shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime)
         {
             // Remove the keyframe at the current time
             uniform.removeKeyframeAtTime(time);
@@ -766,6 +771,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         {
             introLoop(t);
             SwapBuffers(info->hDC);
+            introLoop(t);
         }
 
         if (shouldRerender)

@@ -24,7 +24,7 @@ class Uniform
     UniformValue valueAtTime(float time);
     void setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation = KeyframeInterpolation::Linear,
         float interpolationFactor = 0.0f);
-    bool hasKeyframeAtTime(float time);
+    UniformKeyframe* getKeyframeAtTime(float time);
     bool removeKeyframeAtTime(float time);
     void setConstantValue(const UniformValue& value);
 };

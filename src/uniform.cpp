@@ -147,50 +147,51 @@ UniformValue Uniform::valueAtTime(float time)
     }
 
     return result;
-    }
+}
 
-    void Uniform::setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation, float interpolationFactor)
-    {
-        UniformKeyframe keyframe{};
-        keyframe.time = time;
-        keyframe.value = value;
-        keyframe.interpolation = interpolation;
-        keyframe.interpolationFactor = interpolationFactor;
+void Uniform::setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation, float interpolationFactor)
+{
+    UniformKeyframe keyframe{};
+    keyframe.time = time;
+    keyframe.value = value;
+    keyframe.interpolation = interpolation;
+    keyframe.interpolationFactor = interpolationFactor;
 
     auto it = std::lower_bound(
         keyframes.begin(), keyframes.end(), keyframe, [](const UniformKeyframe& a, const UniformKeyframe& b) { return a.time < b.time; });
 
-        if (it != keyframes.end() && it->time == time)
-        {
-            // If the keyframe already exists at this time, replace it
-            *it = keyframe;
-            return;
-        }
-
-        keyframes.insert(it, keyframe);
-    }
-
-    bool Uniform::hasKeyframeAtTime(float time)
+    if (it != keyframes.end() && it->time == time)
     {
-        return std::any_of(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+        // If the keyframe already exists at this time, replace it
+        *it = keyframe;
+        return;
     }
 
-    bool Uniform::removeKeyframeAtTime(float time)
+    keyframes.insert(it, keyframe);
+}
+
+UniformKeyframe* Uniform::getKeyframeAtTime(float time)
+{
+    auto result = std::find_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+    return result != keyframes.end() ? &(*result) : nullptr;
+}
+
+bool Uniform::removeKeyframeAtTime(float time)
+{
+    auto it = std::remove_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+
+    bool found = it != keyframes.end();
+
+    if (found)
     {
-        auto it = std::remove_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
-
-        bool found = it != keyframes.end();
-
-        if (found)
-        {
-            keyframes.erase(it, keyframes.end());
-        }
-
-        return found;
+        keyframes.erase(it, keyframes.end());
     }
 
-    void Uniform::setConstantValue(const UniformValue& value)
-    {
-        keyframes.clear();
-        setKeyframeAtTime(0.0f, value, KeyframeInterpolation::Step, 0.0f);
-    }
+    return found;
+}
+
+void Uniform::setConstantValue(const UniformValue& value)
+{
+    keyframes.clear();
+    setKeyframeAtTime(0.0f, value, KeyframeInterpolation::Step, 0.0f);
+}

@@ -210,7 +210,12 @@ bool TimeSlider(const char* label, int* data, int min, int max)
     return value_changed;
 }
 
-bool KeyframeMarker(const char* label, bool* data)
+const int NUM_POSSIBLE_INTERPOLATIONS = 4;
+const KeyframeInterpolation POSSIBLE_INTERPOLATIONS[] = {
+    KeyframeInterpolation::Linear, KeyframeInterpolation::Step, KeyframeInterpolation::Tonemap, KeyframeInterpolation::Gain};
+const char* INTERPOLATION_NAMES[] = {"Linear", "Step", "Tonemap", "Gain"};
+
+bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension)
 {
     const ImU32 KEYFRAME_OUTLINE_COLOR = GetColorU32(ImGuiCol_SliderGrabActive);
     const ImU32 KEYFRAME_INACTIVE_COLOR = GetColorU32(ImGuiCol_FrameBg);
@@ -251,6 +256,32 @@ bool KeyframeMarker(const char* label, bool* data)
     auto color = *data ? KEYFRAME_ACTIVE_COLOR : (hovered ? KEYFRAME_HOVERED_COLOR : KEYFRAME_INACTIVE_COLOR);
     draw_list->AddConvexPolyFilled(rhombus_points, 4, color);
     draw_list->AddPolyline(rhombus_points, 4, KEYFRAME_OUTLINE_COLOR, ImDrawFlags_Closed, 1.);
+
+    if (*data)
+    {
+        if (BeginPopupContextItem(label))
+        {
+            for (int i = 0; i < NUM_POSSIBLE_INTERPOLATIONS; i++)
+            {
+                bool is_selected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
+
+                if (Selectable(INTERPOLATION_NAMES[i], is_selected))
+                {
+                    *interpolation = POSSIBLE_INTERPOLATIONS[i];
+                    pressed = true;
+                }
+
+                if (is_selected) SetItemDefaultFocus();
+            }
+
+            if (SliderFloat("Tension", tension, 0.0f, 1.0f, "%.2f"))
+            {
+                pressed = true;
+            }
+
+            EndPopup();
+        }
+    }
 
     return pressed;
 }
