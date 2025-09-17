@@ -1,5 +1,5 @@
-#include "CameraController.h";
-#include "imgui\imgui.h";
+#include "CameraController.h"
+#include "imgui\imgui.h"
 
 constexpr static float PI = 3.141f;
 

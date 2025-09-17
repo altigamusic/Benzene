@@ -1,5 +1,5 @@
-#include "intro.h";
-#include "windows.h";
+#include "intro.h"
+#include "windows.h"
 
 class CameraController
 {
