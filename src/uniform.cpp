@@ -38,6 +38,23 @@ UniformValue getDefault(UniformType type)
     return value;
 }
 
+float convert01ToCorrectFactor(float interpolationFactor, KeyframeInterpolation interpolation)
+{
+    // No factor needed for linear or step
+    if (interpolation != KeyframeInterpolation::Gain && interpolation != KeyframeInterpolation::Tonemap) return 0;
+
+    // Gain is 0 - infinity with inflection at 1, tonemap is -1 - infinity with inflection at 0
+    float a = interpolationFactor;
+
+    if (a < 0.5)
+        a *= 2;
+    else
+        a = 1 + (a - 0.5) * 20;
+
+    if (interpolation == KeyframeInterpolation::Tonemap) a -= 1;
+    return a;
+}
+
 float lerp(float a, float b, float x) { return a + (b - a) * x; }
 
 float gain(float x, float factor)
@@ -61,9 +78,9 @@ float interpolate0to1(float x, KeyframeInterpolation interpolation, float interp
     case KeyframeInterpolation::Step:
         return 0.0f;
     case KeyframeInterpolation::Gain:
-        return gain(x, interpolationFactor);
+        return gain(x, convert01ToCorrectFactor(interpolationFactor, interpolation));
     case KeyframeInterpolation::Tonemap:
-        return tonemap(x, interpolationFactor);
+        return tonemap(x, convert01ToCorrectFactor(interpolationFactor, interpolation));
     default:
         return x;
     }
@@ -140,8 +157,8 @@ UniformValue Uniform::valueAtTime(float time)
         keyframe.interpolation = interpolation;
         keyframe.interpolationFactor = interpolationFactor;
 
-        auto it = std::lower_bound(keyframes.begin(), keyframes.end(), keyframe,
-            [](const UniformKeyframe& a, const UniformKeyframe& b) { return a.time < b.time; });
+    auto it = std::lower_bound(
+        keyframes.begin(), keyframes.end(), keyframe, [](const UniformKeyframe& a, const UniformKeyframe& b) { return a.time < b.time; });
 
         if (it != keyframes.end() && it->time == time)
         {
