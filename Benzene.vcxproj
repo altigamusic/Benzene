@@ -45,6 +45,7 @@
     <ClInclude Include="src\imgui\imstb_truetype.h" />
     <ClInclude Include="src\intro.h" />
     <ClInclude Include="src\uniform.h" />
+    <ClInclude Include="src\uniform_data_types.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\imgui\imgui.natstepfilter" />
