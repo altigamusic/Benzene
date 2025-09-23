@@ -58,7 +58,19 @@ std::vector<Uniform> uniformList;
 
 void initIntro() {}
 
-std::vector<std::string> getUndeclaredIdentifiers(std::string debugError)
+void openDebugWindow(std::string error)
+{
+    debugError += error + "\n";
+    showDebugWindow = true;
+}
+
+void closeDebugWindow()
+{
+    debugError = "";
+    showDebugWindow = false;
+}
+
+std::vector<std::string> getUndeclaredIdentifiers(std::string error)
 {
     std::regex undeclaredIdentifierRegex(
         "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared identifier", std::regex::icase);
@@ -66,8 +78,8 @@ std::vector<std::string> getUndeclaredIdentifiers(std::string debugError)
     std::vector<std::string> result;
     std::smatch match;
 
-    std::string::const_iterator searchStart(debugError.cbegin());
-    while (std::regex_search(searchStart, debugError.cend(), match, undeclaredIdentifierRegex))
+    std::string::const_iterator searchStart(error.cbegin());
+    while (std::regex_search(searchStart, error.cend(), match, undeclaredIdentifierRegex))
     {
         if (match.size() > 1)
         {
@@ -174,13 +186,13 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
 
     glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
 
-    debugError = std::string(infoLog, length);
+    std::string error(infoLog, length);
 
     if (length > 0)
     {
         if (!didTryInjecting)
         {
-            auto undeclaredIdentifiers = getUndeclaredIdentifiers(debugError);
+            auto undeclaredIdentifiers = getUndeclaredIdentifiers(error);
 
             // Inject all undeclared identifiers as uniforms and recompile
             for (const std::string& name : undeclaredIdentifiers)
@@ -191,12 +203,12 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
             return loadFragmentShader(fragmentShaderSource, true);
         }
 
-        showDebugWindow = true;
+        openDebugWindow(error);
         return;
     }
     else
     {
-        showDebugWindow = false;
+        closeDebugWindow();
     }
 
     timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
@@ -836,6 +848,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         {
             ImGui::TextUnformatted(debugError.c_str());
             ImGui::End();
+            if (!showDebugWindow) closeDebugWindow();
         }
 
         // If the render stopped just now, render to the back buffer
