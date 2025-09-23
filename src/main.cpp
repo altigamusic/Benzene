@@ -491,8 +491,7 @@ bool renderAndUpdateUniforms(float time)
         bool shouldHaveKeyframeAtCurrentTime = hasKeyframeAtCurrentTime;
         KeyframeInterpolation interpolation =
             hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolation : KeyframeInterpolation::Linear;
-        float tension =
-            hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
+        float tension = hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
 
         bool didChange = KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension);
 
@@ -641,6 +640,73 @@ bool renderTimelines(int* time, int maxTime)
     return didChange;
 }
 
+int findPreviousKeyframe(int t, const std::vector<int>& keyframes)
+{
+    auto it = std::lower_bound(keyframes.begin(), keyframes.end(), t);
+
+    if (it != keyframes.begin())
+    {
+        --it;
+        return *it;
+    }
+
+    return -1; // No previous keyframe
+}
+
+int findNextKeyframe(int t, const std::vector<int>& keyframes)
+{
+    auto it = std::upper_bound(keyframes.begin(), keyframes.end(), t);
+
+    if (it != keyframes.end()) return *it;
+
+    return -1; // No next keyframe
+}
+
+bool handleKeyScrubbing(int& t, int maxTimelineTime)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureKeyboard) return false;
+
+    // Get sorted list of all keyframes
+    std::vector<int> keyframes = getAllKeyframes();
+
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
+    {
+        if (!io.KeyCtrl)
+        {
+            t = max(0, t - 100);
+            return true;
+        }
+
+        int prevKeyframe = findPreviousKeyframe(t, keyframes);
+
+        if (prevKeyframe != -1)
+        {
+            t = prevKeyframe;
+            return true;
+        }
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
+    {
+        if (!io.KeyCtrl)
+        {
+            t = min(maxTimelineTime, t + 100);
+            return true;
+        }
+
+        int nextKeyframe = findNextKeyframe(t, keyframes);
+
+        if (nextKeyframe != -1)
+        {
+            t = nextKeyframe;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
@@ -704,6 +770,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         cameraController.updateCamera(timeDelta);
 
         bool shouldRerender = isPlaying;
+
+        if (handleKeyScrubbing(t, 140000))
+        {
+            isPlaying = false;
+            shouldRerender = true;
+        }
 
         ImGui::SetNextWindowPos(ImVec2(0, viewportHeight), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
