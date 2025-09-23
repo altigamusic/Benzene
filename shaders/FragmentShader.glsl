@@ -19,12 +19,18 @@ void main(){
     vec2 uv=(fragCoord/_res-0.5)/vec2(_res.y/_res.x,1);  //2d uvs
     vec3 col=vec3(0.5)*cos(uv.x*PI)*.5+.5;
     
-    vec2 p = vec2(rad, 0);
+    vec2 p = vec2(rad, offset);
+    
     p *= rot(_t);
+    p += p2;
     col = mix(R, col, circle(uv, p, 0.1));
+    p -= p2;
     p *= rot(TAU / 3.0);
+    p += p2;
     col = mix(R, col, circle(uv, p, 0.1));
+    p -= p2;
     p *= rot(TAU / 3.0);
+    p += p2;
     col = mix(R, col, circle(uv, p, 0.1));
 
     col = mix(G, col, circle(uv, p1, 0.1));
