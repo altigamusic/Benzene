@@ -561,50 +561,62 @@ bool renderAndUpdateUniforms(float time)
     return didAnythingChange;
 }
 
-UniformValue loadValueFromStrings(const std::string& typeString, const std::string& valueStr, UniformType& type)
+UniformType getUniformTypeFromString(const std::string& typeString)
+{
+    if (typeString == "float")
+        return UniformType::Float;
+    else if (typeString == "int")
+        return UniformType::Int;
+    else if (typeString == "bool")
+        return UniformType::Bool;
+    else if (typeString == "vec2")
+        return UniformType::Vec2;
+    else if (typeString == "vec3")
+        return UniformType::Vec3;
+    else if (typeString == "color")
+        return UniformType::Color;
+    else if (typeString == "vec4")
+        return UniformType::Vec4;
+    else
+        return UniformType::Untyped;
+}
+
+UniformValue getUniformValueFromString(const UniformType type, const std::string& valueStr)
 {
     UniformValue value{};
     bool loadError = false;
 
-    if (typeString == "float")
+    switch (type)
     {
-        type = UniformType::Float;
+    case UniformType::Float:
         value.f = std::stof(valueStr);
-    }
-    else if (typeString == "int")
-    {
-        type = UniformType::Int;
+        break;
+    case UniformType::Int:
         value.i = std::stoi(valueStr);
-    }
-    else if (typeString == "bool")
-    {
-        type = UniformType::Bool;
+        break;
+    case UniformType::Bool:
         value.b = (valueStr == "true");
         loadError = valueStr != "false" && valueStr != "true";
-    }
-    else if (typeString == "vec2")
-    {
-        type = UniformType::Vec2;
+        break;
+    case UniformType::Vec2:
         loadError = sscanf(valueStr.c_str(), "%f/%f", &value.v2[0], &value.v2[1]) != 2;
-    }
-    else if (typeString == "vec3" || typeString == "color")
-    {
-        type = typeString == "Color" ? UniformType::Color : UniformType::Vec3;
+        break;
+    case UniformType::Vec3:
         loadError = sscanf(valueStr.c_str(), "%f/%f/%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
-    }
-    else if (typeString == "vec4")
-    {
-        type = UniformType::Vec4;
+        break;
+    case UniformType::Color:
+        loadError = sscanf(valueStr.c_str(), "%f/%f/%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
+        break;
+    case UniformType::Vec4:
         loadError = sscanf(valueStr.c_str(), "%f/%f/%f/%f", &value.v4[0], &value.v4[1], &value.v4[2], &value.v4[3]) != 4;
-    }
-    else
-    {
+        break;
+    default:
         loadError = true;
+        break;
     }
 
     if (loadError)
     {
-        type = UniformType::Untyped;
         throw std::runtime_error("Failed to parse uniform value from string: " + valueStr);
     }
 
@@ -613,13 +625,16 @@ UniformValue loadValueFromStrings(const std::string& typeString, const std::stri
 
 Uniform loadUniformFromLine(std::stringstream& line)
 {
-    std::string name, type, valueStr;
+    std::string name, typeStr, valueStr = "";
     bool loadError = false;
 
-    if (!std::getline(line, name, ';') || !std::getline(line, type, ';') || !std::getline(line, valueStr))
+    if (!std::getline(line, name, ';') || !std::getline(line, typeStr, ';'))
         throw new std::runtime_error("Failed to read uniform from file");
 
+    std::getline(line, valueStr);
+
     Uniform uniform(name);
+    uniform.type = getUniformTypeFromString(typeStr);
 
     std::stringstream keyframeStream(valueStr);
     std::string keyframeStr;
@@ -638,7 +653,7 @@ Uniform loadUniformFromLine(std::stringstream& line)
             throw new std::runtime_error("Invalid keyframe interpolation factor");
 
         float time = std::stof(timeStr);
-        UniformValue value = loadValueFromStrings(type, valueStr, uniform.type);
+        UniformValue value = getUniformValueFromString(uniform.type, valueStr);
         KeyframeInterpolation interpolation = static_cast<KeyframeInterpolation>(std::stoi(interpolationTypeStr));
         float interpolationFactor = std::stof(interpolationFactorStr);
 
