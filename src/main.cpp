@@ -53,6 +53,7 @@ bool isSpaceDown;
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
 static GLuint resolutionLocation = -1;
+static GLuint windowOffsetLocation = -1;
 std::string currentShader;
 std::vector<Uniform> uniformList;
 
@@ -212,8 +213,9 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
 
     std::string source =
         "#version 330\n"
-        "uniform vec2 _res;\n"
-        "uniform float _t;\n" +
+        "uniform vec2 _res, _windowOffset;\n"
+        "uniform float _t;\n"
+        "vec2 fragCoord = gl_FragCoord.xy - _windowOffset;\n" +
         generateUniformCode() + fragmentShaderSource;
 
     const char* srcPtr = source.c_str();
@@ -248,6 +250,7 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
 
     timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
     resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
+    windowOffsetLocation = glGetUniformLocation(fragmentShaderProgram, "_windowOffset");
 
     resizeWindow(windowWidth, windowHeight);
 
@@ -292,6 +295,7 @@ void introLoop(long timeInMs)
 
     glUniform1f(timeLocation, ftime);
     glUniform2f(resolutionLocation, viewportWidth, viewportHeight);
+    glUniform2f(windowOffsetLocation, sidebarWidth, timelineHeight);
 
     for (Uniform& uniform : uniformList)
     {

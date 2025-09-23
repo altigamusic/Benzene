@@ -15,7 +15,6 @@ float circle(vec2 uv, vec2 p, float r) {
 }
 
 void main(){
-    vec2 fragCoord = gl_FragCoord.xy;
     vec2 uv=(fragCoord/_res-0.5)/vec2(_res.y/_res.x,1);  //2d uvs
     vec3 col=vec3(0.5)*cos(uv.x*PI)*.5+.5;
     
