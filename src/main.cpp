@@ -14,8 +14,8 @@
 #include <vector>
 #include <iomanip>
 #include <windows.h>
-#include "CameraController.h";
-#include "uniform.h";
+#include "CameraController.h"
+#include "uniform.h"
 #include <regex>
 #include "imgui/imgui_benzene_widgets.h"
 
