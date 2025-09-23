@@ -125,43 +125,78 @@ std::string generateUniformCode()
 
 void saveUniformsToFile(const std::string& filename)
 {
-    /*std::ofstream file(filename);
+    std::ofstream file(filename);
     if (!file.is_open())
     {
-        debugError = "Failed to open file for saving uniforms: " + filename;
-        showDebugWindow = true;
+        openDebugWindow("Failed to open file for saving uniforms: " + filename);
         return;
     }
+
     for (const Uniform& uniform : uniformList)
     {
+        file << uniform.name;
+
         switch (uniform.type)
         {
         case UniformType::Float:
-            file << uniform.name << ";float;" << std::fixed << std::setprecision(6) << uniform.value.f << "\n";
+            file << ";float;";
             break;
         case UniformType::Int:
-            file << uniform.name << ";int;" << uniform.value.i << "\n";
+            file << ";int;";
             break;
         case UniformType::Bool:
-            file << uniform.name << ";bool;" << (uniform.value.b ? "true" : "false") << "\n";
+            file << ";bool;";
             break;
         case UniformType::Vec2:
-            file << uniform.name << ";vec2;" << std::fixed << std::setprecision(6) << uniform.value.v2[0] << "," << uniform.value.v2[1]
-                 << "\n";
+            file << ";vec2;";
             break;
         case UniformType::Vec3:
-            file << uniform.name << ";vec3;" << uniform.value.v3[0] << "," << uniform.value.v3[1] << "," << uniform.value.v3[2] << "\n";
+            file << ";vec3;";
             break;
         case UniformType::Color:
-            file << uniform.name << ";color;" << uniform.value.v3[0] << "," << uniform.value.v3[1] << "," << uniform.value.v3[2] << "\n";
+            file << ";color;";
             break;
         case UniformType::Vec4:
-            file << uniform.name << ";vec4;" << uniform.value.v4[0] << "," << uniform.value.v4[1] << "," << uniform.value.v4[2] << ","
-                 << uniform.value.v4[3] << "\n";
+            file << ";vec4;";
             break;
         }
+
+        for (auto& keyframe : uniform.keyframes)
+        {
+            file << (int)keyframe.time << ",";
+
+            switch (uniform.type)
+            {
+            case UniformType::Float:
+                file << std::fixed << std::setprecision(6) << keyframe.value.f;
+                break;
+            case UniformType::Int:
+                file << keyframe.value.i;
+                break;
+            case UniformType::Bool:
+                file << (keyframe.value.b ? "true" : "false");
+                break;
+            case UniformType::Vec2:
+                file << std::fixed << std::setprecision(6) << keyframe.value.v2[0] << "/" << keyframe.value.v2[1];
+                break;
+            case UniformType::Vec3:
+                file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
+                break;
+            case UniformType::Color:
+                file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
+                break;
+            case UniformType::Vec4:
+                file << keyframe.value.v4[0] << "/" << keyframe.value.v4[1] << "/" << keyframe.value.v4[2] << "/" << keyframe.value.v4[3];
+                break;
+            }
+
+            file << "," << keyframe.interpolationToNumber() << "," << keyframe.interpolationFactor << ";";
+        }
+
+        file << "\n";
     }
-    file.close();*/
+
+    file.close();
 }
 
 void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting = false)
@@ -526,6 +561,93 @@ bool renderAndUpdateUniforms(float time)
     return didAnythingChange;
 }
 
+UniformValue loadValueFromStrings(const std::string& typeString, const std::string& valueStr, UniformType& type)
+{
+    UniformValue value{};
+    bool loadError = false;
+
+    if (typeString == "float")
+    {
+        type = UniformType::Float;
+        value.f = std::stof(valueStr);
+    }
+    else if (typeString == "int")
+    {
+        type = UniformType::Int;
+        value.i = std::stoi(valueStr);
+    }
+    else if (typeString == "bool")
+    {
+        type = UniformType::Bool;
+        value.b = (valueStr == "true");
+        loadError = valueStr != "false" && valueStr != "true";
+    }
+    else if (typeString == "vec2")
+    {
+        type = UniformType::Vec2;
+        loadError = sscanf(valueStr.c_str(), "%f/%f", &value.v2[0], &value.v2[1]) != 2;
+    }
+    else if (typeString == "vec3" || typeString == "color")
+    {
+        type = typeString == "Color" ? UniformType::Color : UniformType::Vec3;
+        loadError = sscanf(valueStr.c_str(), "%f/%f/%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
+    }
+    else if (typeString == "vec4")
+    {
+        type = UniformType::Vec4;
+        loadError = sscanf(valueStr.c_str(), "%f/%f/%f/%f", &value.v4[0], &value.v4[1], &value.v4[2], &value.v4[3]) != 4;
+    }
+    else
+    {
+        loadError = true;
+    }
+
+    if (loadError)
+    {
+        type = UniformType::Untyped;
+        throw std::runtime_error("Failed to parse uniform value from string: " + valueStr);
+    }
+
+    return value;
+}
+
+Uniform loadUniformFromLine(std::stringstream& line)
+{
+    std::string name, type, valueStr;
+    bool loadError = false;
+
+    if (!std::getline(line, name, ';') || !std::getline(line, type, ';') || !std::getline(line, valueStr))
+        throw new std::runtime_error("Failed to read uniform from file");
+
+    Uniform uniform(name);
+
+    std::stringstream keyframeStream(valueStr);
+    std::string keyframeStr;
+
+    while (std::getline(keyframeStream, keyframeStr, ';'))
+    {
+        if (keyframeStr.empty()) continue;
+
+        std::stringstream keyframeStream(keyframeStr);
+        std::string timeStr, valueStr, interpolationTypeStr, interpolationFactorStr;
+
+        if (!std::getline(keyframeStream, timeStr, ',')) throw new std::runtime_error("Invalid keyframe time");
+        if (!std::getline(keyframeStream, valueStr, ',')) throw new std::runtime_error("Invalid keyframe value");
+        if (!std::getline(keyframeStream, interpolationTypeStr, ',')) throw new std::runtime_error("Invalid keyframe interpolation type");
+        if (!std::getline(keyframeStream, interpolationFactorStr, ','))
+            throw new std::runtime_error("Invalid keyframe interpolation factor");
+
+        float time = std::stof(timeStr);
+        UniformValue value = loadValueFromStrings(type, valueStr, uniform.type);
+        KeyframeInterpolation interpolation = static_cast<KeyframeInterpolation>(std::stoi(interpolationTypeStr));
+        float interpolationFactor = std::stof(interpolationFactorStr);
+
+        uniform.setKeyframeAtTime(time, value, interpolation, interpolationFactor);
+    }
+
+    return uniform;
+}
+
 void loadUniformsFromFile(const std::string& filename)
 {
     uniformList.clear();
@@ -541,74 +663,22 @@ void loadUniformsFromFile(const std::string& filename)
 
     while (std::getline(file, line))
     {
-        std::stringstream ss(line);
+        std::stringstream lineStream(line);
         std::string name, type, valueStr;
         bool loadError = false;
 
-        if (std::getline(ss, name, ';') && std::getline(ss, type, ';') && std::getline(ss, valueStr))
+        try
         {
-            Uniform uniform(name);
-            UniformValue value;
-
-            try
-            {
-                if (type == "float")
-                {
-                    uniform.type = UniformType::Float;
-                    value.f = std::stof(valueStr);
-                }
-                else if (type == "int")
-                {
-                    uniform.type = UniformType::Int;
-                    value.i = std::stoi(valueStr);
-                }
-                else if (type == "bool")
-                {
-                    uniform.type = UniformType::Bool;
-                    value.b = (valueStr == "true");
-                    loadError = valueStr != "false" && valueStr != "true";
-                }
-                else if (type == "vec2")
-                {
-                    uniform.type = UniformType::Vec2;
-                    loadError = sscanf(valueStr.c_str(), "%f,%f", &value.v2[0], &value.v2[1]) != 2;
-                }
-                else if (type == "vec3" || type == "color")
-                {
-                    uniform.type = type == "vec3" ? UniformType::Vec3 : UniformType::Color;
-                    loadError = sscanf(valueStr.c_str(), "%f,%f,%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
-                }
-                else if (type == "vec4")
-                {
-                    uniform.type = UniformType::Vec4;
-                    loadError = sscanf(valueStr.c_str(), "%f,%f,%f,%f", &value.v4[0], &value.v4[1], &value.v4[2], &value.v4[3]) != 4;
-                }
-                else
-                {
-                    loadError = true;
-                }
-            }
-            catch (const std::invalid_argument&)
-            {
-                loadError = true;
-            }
-            catch (const std::out_of_range&)
-            {
-                loadError = true;
-            }
-
-            if (loadError || uniform.type == UniformType::Untyped)
-            {
-                debugError = "Corrupt uniform file, ignoring";
-                showDebugWindow = true;
-                uniformList.clear();
-                return;
-            }
-
-            uniform.setConstantValue(value);
-            uniformList.push_back(uniform);
+            Uniform nextUniform = loadUniformFromLine(lineStream);
+            if (nextUniform.type == UniformType::Untyped) throw std::runtime_error("Failed to load uniform from line: " + line);
+            uniformList.push_back(nextUniform);
+        }
+        catch (const std::exception& e)
+        {
+            openDebugWindow(e.what());
         }
     }
+
     file.close();
 }
 

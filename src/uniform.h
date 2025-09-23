@@ -9,6 +9,8 @@ struct UniformKeyframe
     UniformValue value;
     KeyframeInterpolation interpolation;
     float interpolationFactor;
+
+    int interpolationToNumber() const { return static_cast<int>(interpolation); }
 };
 
 class Uniform
