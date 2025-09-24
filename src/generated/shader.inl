@@ -8,7 +8,7 @@
 # define VAR_p2 "c"
 # define VAR_rad "f"
 
-const char *fragmentShaderSource =
+const inline char *fragmentShaderSource =
  "#version 330\n"
  "uniform float v,f,l;"
  "uniform vec2 m,c;"

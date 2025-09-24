@@ -177,9 +177,10 @@ vec2 fragCoord = gl_FragCoord.xy;
     os.remove("__temp_shader.glsl")
 
     # Replace the file name with "fragmentShaderSource" (you can't do that using the shader minifier directly)
+    # Also it has to be inlined, because it's imported in two different files
     with open(output_filename, "r") as f:
         minified_code = f.read()
-    minified_code = minified_code.replace("__temp_shader_glsl", "fragmentShaderSource")
+    minified_code = minified_code.replace("const char *__temp_shader_glsl", "const inline char *fragmentShaderSource")
     with open(output_filename, "w") as f:
         f.write(minified_code)
 
