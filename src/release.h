@@ -45,7 +45,7 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
 }
 
 void locateUniforms(GLuint program);
-void updateUniforms(float time);
+void updateUniforms(long time);
 
 inline void initFragmentShader(const char* fragmentShaderSource)
 {

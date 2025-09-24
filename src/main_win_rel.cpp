@@ -11,6 +11,7 @@
 #include <mmsystem.h>
 #include "ext.h"
 #include "release.h"
+#include "intro.h"
 
 static const PIXELFORMATDESCRIPTOR pfd = {sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
     PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 32, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0};
@@ -79,6 +80,7 @@ void entrypoint(void)
 
     if (!EXT_Init()) return RETURN_VALUE;
 
+    initIntro();
     initFragmentShader(fragmentShaderSource);
 
     // play intro
@@ -88,8 +90,9 @@ void entrypoint(void)
 
     do {
         t = timeGetTime() - to;
-        updateUniforms(t);
-        glRects(-1, -1, 1, 1);
+        
+        introLoop(t);
+
         wglSwapLayerBuffers(hDC, WGL_SWAP_MAIN_PLANE); // SwapBuffers( hDC );
     } while (!GetAsyncKeyState(VK_ESCAPE) && t < 15000);
 

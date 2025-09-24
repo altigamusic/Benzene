@@ -57,8 +57,6 @@ static GLuint windowOffsetLocation = -1;
 std::string currentShader;
 std::vector<Uniform> uniformList;
 
-void initIntro() {}
-
 void openDebugWindow(std::string error)
 {
     debugError += error + "\n";
@@ -289,7 +287,7 @@ bool reloadFragmentShaderFromFile()
     return didChange;
 }
 
-void introLoop(long timeInMs)
+void updateUniforms(long timeInMs)
 {
     const float ftime = 0.001f * (float)timeInMs;
 
@@ -324,8 +322,6 @@ void introLoop(long timeInMs)
             break;
         }
     }
-
-    glRects(-1, -1, 1, 1);
 }
 
 #pragma region Window and Rendering Boilerplate

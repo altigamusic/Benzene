@@ -1,6 +1,5 @@
 import os
 from re import sub
-from sre_constants import IN_LOC_IGNORE
 import subprocess
 
 UNIFORM_TYPE_TO_GL_FUNCTION = {
@@ -122,7 +121,8 @@ def generate_release_file_code(uniforms):
         if number_of_keyframes == 0:
             params = ["0.0f"] * number_of_params(uniform)
         else:
-            params = [f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
+            params = [
+                f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
         param_string = ",".join(params)
         kf_index += len(params)
 
@@ -141,7 +141,7 @@ void locateUniforms(GLuint program) {{
 {uniform_locations}
 }}
 
-void updateUniforms(float time) {{
+void updateUniforms(long time) {{
     glUniform1f(timeUniformLocation, time / 1000.0f);
 {uniform_updates}
 }}

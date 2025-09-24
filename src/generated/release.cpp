@@ -17,7 +17,7 @@ void locateUniforms(GLuint program) {
     UNIFORMS[3] = glGetUniformLocation(program, VAR_p2);
 }
 
-void updateUniforms(float time) {
+void updateUniforms(long time) {
     glUniform1f(timeUniformLocation, time / 1000.0f);
     glUniform1f(UNIFORMS[0], valueAtTime(time, keyframes0, 3));
     glUniform1f(UNIFORMS[1], 0.0f);
