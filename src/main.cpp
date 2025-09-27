@@ -543,10 +543,10 @@ bool renderAndUpdateUniforms(float time)
         }
 
         int uniformTypeIndex = uniform.type == UniformType::Float   ? 0
-                  : uniform.type == UniformType::Vec2  ? 1
-                  : uniform.type == UniformType::Vec3  ? 2
-                  : uniform.type == UniformType::Color ? 3
-                                                       : 0;
+                               : uniform.type == UniformType::Vec2  ? 1
+                               : uniform.type == UniformType::Vec3  ? 2
+                               : uniform.type == UniformType::Color ? 3
+                                                                    : 0;
 
         char* items[] = {"float", "vec2", "vec3", "color"};
 
@@ -851,6 +851,33 @@ bool handleKeyScrubbing(int& t, int maxTimelineTime)
     return false;
 }
 
+bool renderMenuBar()
+{
+    bool didChange = false;
+
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Reload Uniforms From File"))
+            {
+                loadUniformsFromFile(uniformFileName);
+                loadFragmentShader(currentShader.c_str());
+                didChange = true;
+            }
+            if (ImGui::MenuItem("Save Uniforms"))
+            {
+                saveUniformsToFile(uniformFileName);
+            }
+
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+    }
+
+    return didChange;
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
@@ -947,7 +974,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(sidebarWidth, sidebarHeight), ImGuiCond_Always);
 
-        ImGui::Begin("Properties", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+        ImGui::Begin("Editor", nullptr,
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar |
+                ImGuiWindowFlags_NoTitleBar);
+
+        if (renderMenuBar()) shouldRerender = true;
+
         if (renderAndUpdateUniforms(t))
         {
             shouldRerender = true;
