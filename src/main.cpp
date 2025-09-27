@@ -542,7 +542,43 @@ bool renderAndUpdateUniforms(float time)
             break;
         }
 
-        ImGui::SameLine();
+        int uniformTypeIndex = uniform.type == UniformType::Float   ? 0
+                  : uniform.type == UniformType::Vec2  ? 1
+                  : uniform.type == UniformType::Vec3  ? 2
+                  : uniform.type == UniformType::Color ? 3
+                                                       : 0;
+
+        char* items[] = {"float", "vec2", "vec3", "color"};
+
+        if (ImGui::BeginPopupContextItem(uniform.name.c_str()))
+        {
+            if (ImGui::Combo("Type", &uniformTypeIndex, items, 4))
+            {
+                switch (uniformTypeIndex)
+                {
+                case 0:
+                    uniform.type = UniformType::Float;
+                    break;
+                case 1:
+                    uniform.type = UniformType::Vec2;
+                    break;
+                case 2:
+                    uniform.type = UniformType::Vec3;
+                    break;
+                case 3:
+                    uniform.type = UniformType::Color;
+                    break;
+                default:
+                    break;
+                }
+
+                // Don't activate didThisUniformChange here so a keyframe won't be created
+                didAnythingChange = true;
+                uniform.keyframes.clear();
+            }
+
+            ImGui::End();
+        }
 
         bool hasKeyframeAtCurrentTime = keyframeAtCurrentTime != nullptr;
         bool shouldHaveKeyframeAtCurrentTime = hasKeyframeAtCurrentTime;
@@ -550,6 +586,7 @@ bool renderAndUpdateUniforms(float time)
             hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolation : KeyframeInterpolation::Linear;
         float tension = hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
 
+        ImGui::SameLine();
         bool didChange = KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension);
 
         // If the uniform changed (or the keyframe button/interpolation was clicked), set a keyframe at the current time
