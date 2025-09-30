@@ -270,6 +270,7 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
     }
 
     glUseProgram(fragmentShaderProgram);
+    initIntro(fragmentShaderProgram);
 }
 
 bool reloadFragmentShaderFromFile()
@@ -903,7 +904,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         return 0;
     }
 
-    initIntro();
     cameraController.recalculateCameraTarget();
     loadUniformsFromFile(uniformFileName);
 

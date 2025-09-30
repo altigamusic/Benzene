@@ -80,8 +80,8 @@ void entrypoint(void)
 
     if (!EXT_Init()) return RETURN_VALUE;
 
-    initIntro();
-    initFragmentShader(fragmentShaderSource);
+    GLuint program = initFragmentShader(fragmentShaderSource);
+    initIntro(program);
 
     // play intro
     long t = 0;

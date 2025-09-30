@@ -47,7 +47,7 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
 void locateUniforms(GLuint program);
 void updateUniforms(long time);
 
-inline void initFragmentShader(const char* fragmentShaderSource)
+inline GLuint initFragmentShader(const char* fragmentShaderSource)
 {
     GLuint program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
     GLuint pipeline;
@@ -56,4 +56,6 @@ inline void initFragmentShader(const char* fragmentShaderSource)
     glUseProgramStages(pipeline, GL_FRAGMENT_SHADER_BIT, program);
     glUseProgram(program);
     locateUniforms(program);
+
+    return program;
 }

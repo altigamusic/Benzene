@@ -1,11 +1,6 @@
-#include <windows.h>
-#include <gl/GL.h>
+#include "intro.h"
 
-#pragma region External Defines
-void updateUniforms(long timeInMs);
-#pragma endregion
-
-void initIntro()
+void initIntro(GLuint program)
 {
     // Insert code here
 }
