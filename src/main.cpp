@@ -518,8 +518,12 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
     ImGui::SeparatorText("Uniforms");
     ImGui::BeginChild("Uniforms", ImVec2(0, sidebarHeight / 2));
 
-    for (Uniform& uniform : uniformList)
+    auto uniformToDelete = uniformList.end();
+
+    for (auto uniformIt = uniformList.begin(); uniformIt != uniformList.end(); ++uniformIt)
     {
+        Uniform& uniform = *uniformIt;
+
         UniformValue value = uniform.valueAtTime(time);
         bool didThisUniformChange = false;
         UniformKeyframe* keyframeAtCurrentTime = uniform.getKeyframeAtTime(time);
@@ -578,6 +582,13 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
                 uniform.keyframes.clear();
             }
 
+            if (ImGui::Selectable("Delete"))
+            {
+                uniformToDelete = uniformIt;
+                ImGui::End();
+                continue;
+            }
+
             ImGui::End();
         }
 
@@ -596,7 +607,8 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 
         // Set a keyframe if the uniform changed *only if* it's before another keyframe!
         // This is because if it's after the last one, it's more natural to just update the last keyframe value instead.
-        // However, if we're between two keyframes, we don't know which keyframe the user would want to change, or how to interpolate the data.
+        // However, if we're between two keyframes, we don't know which keyframe the user would want to change, or how to interpolate the
+        // data.
         bool shouldSetKeyframeDueToUniformChange = didThisUniformChange && !isBeyondLastKeyframe;
         bool shouldSetKeyframeDueToMarkerChange = didKeyframeInfoChange && shouldHaveKeyframeAtCurrentTime;
 
@@ -621,6 +633,11 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
             uniform.removeKeyframeAtTime(time);
             didAnythingChange = true;
         }
+    }
+
+    if (uniformToDelete != uniformList.end())
+    {
+        uniformList.erase(uniformToDelete);
     }
 
     ImGui::EndChild();
@@ -1001,7 +1018,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         if (renderAndUpdateUniforms(t, isPlaying)) // The function will pause if necessary
             shouldRerender = true;
-        
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
