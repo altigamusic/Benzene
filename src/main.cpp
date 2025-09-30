@@ -509,7 +509,7 @@ static bool window_init(WININFO* info)
 }
 #pragma endregion
 
-bool renderAndUpdateUniforms(float time)
+bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 {
     if (uniformList.empty()) return false;
 
@@ -588,15 +588,34 @@ bool renderAndUpdateUniforms(float time)
         float tension = hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
 
         ImGui::SameLine();
-        bool didChange = KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension);
+        bool didKeyframeInfoChange =
+            KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension);
 
-        // If the uniform changed (or the keyframe button/interpolation was clicked), set a keyframe at the current time
-        if (didThisUniformChange || (didChange && shouldHaveKeyframeAtCurrentTime))
+        float lastKeyframeTime = uniform.keyframes.empty() ? 0 : uniform.keyframes.back().time;
+        bool isBeyondLastKeyframe = lastKeyframeTime <= time;
+
+        // Set a keyframe if the uniform changed *only if* it's before another keyframe!
+        // This is because if it's after the last one, it's more natural to just update the last keyframe value instead.
+        // However, if we're between two keyframes, we don't know which keyframe the user would want to change, or how to interpolate the data.
+        bool shouldSetKeyframeDueToUniformChange = didThisUniformChange && !isBeyondLastKeyframe;
+        bool shouldSetKeyframeDueToMarkerChange = didKeyframeInfoChange && shouldHaveKeyframeAtCurrentTime;
+
+        bool shouldSetKeyframe = shouldSetKeyframeDueToUniformChange || shouldSetKeyframeDueToMarkerChange;
+        bool shouldRemoveKeyframe = didKeyframeInfoChange && !shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime;
+        bool shouldUpdateLastKeyframeValue = didThisUniformChange && isBeyondLastKeyframe;
+
+        if (shouldSetKeyframe)
         {
             uniform.setKeyframeAtTime(time, value, interpolation, tension);
             didAnythingChange = true;
+            shouldKeepPlaying = false; // Pause only if a keyframe was created, no other reason
         }
-        else if (didChange && !shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime)
+        else if (shouldUpdateLastKeyframeValue)
+        {
+            uniform.setKeyframeAtTime(lastKeyframeTime, value, interpolation, tension);
+            didAnythingChange = true;
+        }
+        else if (shouldRemoveKeyframe)
         {
             // Remove the keyframe at the current time
             uniform.removeKeyframeAtTime(time);
@@ -980,11 +999,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         if (renderMenuBar()) shouldRerender = true;
 
-        if (renderAndUpdateUniforms(t))
-        {
+        if (renderAndUpdateUniforms(t, isPlaying)) // The function will pause if necessary
             shouldRerender = true;
-            isPlaying = false; // Pause when changing a uniform
-        }
+        
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
