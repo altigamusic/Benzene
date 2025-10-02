@@ -1,12 +1,19 @@
-$functions = Get-Content "src/glFunctions.txt" -Encoding UTF8
+$functions = Get-Content "src/glFunctions.txt" -Encoding UTF8 | Where-Object { !$_.StartsWith("#") }
+[array]$releaseFunctions = $functions | Where-Object { !$_.StartsWith("+") }
+[array]$debugFunctions = $functions | Where-Object { $_.StartsWith("+") } | ForEach-Object { $_ -replace "^\+", "" }
 
+$releaseArrayString = ($releaseFunctions | ForEach-Object { "`"$($_)`"," }) -join "`r`n    "
+$debugArrayString = ($debugFunctions | ForEach-Object { "`"$($_)`"," }) -join "`r`n    "
+$releaseDefines = "";
+$debugDefines = "";
 
-$arrayString = ($functions | ForEach-Object { "`"$($_)`"," }) -join "`r`n    "
-$defines = "";
-
-for ($i = 0; $i -lt $functions.Count; $i++)
+for ($i = 0; $i -lt $releaseFunctions.Count; $i++)
 {
-    $defines += "#define $($functions[$i]) ((PFN$($functions[$i].ToUpper())PROC)myglfunc[$i])`r`n"
+    $releaseDefines += "#define $($releaseFunctions[$i]) ((PFN$($releaseFunctions[$i].ToUpper())PROC)myglfunc[$i])`r`n"
+}
+for ($j = 0; $j -lt $debugFunctions.Count; $j++)
+{
+    $debugDefines += "#define $($debugFunctions[$j]) ((PFN$($debugFunctions[$j].ToUpper())PROC)myglfunc[$($i+$j)])`r`n"
 }
 
 $hFile = @"
@@ -20,11 +27,19 @@ $hFile = @"
 #include <GL/gl.h>
 #include "glext.h"
 
+#ifdef DEBUG
 #define NUM_FUNCTIONS $($functions.Count)
+#else
+#define NUM_FUNCTIONS $($releaseFunctions.Count)
+#endif
 
 extern void* myglfunc[NUM_FUNCTIONS];
 
-$defines
+$releaseDefines
+#ifdef DEBUG
+$debugDefines
+#endif
+
 int EXT_Init(void);
 
 #endif
@@ -44,7 +59,10 @@ $cppFile = @"
 #endif
 
 static char* strs[] = {
-    $arrayString
+    $releaseArrayString
+#ifdef DEBUG
+    $debugArrayString
+#endif
 };
 
 void* myglfunc[NUM_FUNCTIONS];

@@ -1,3 +1,4 @@
+# Lines starting with + are debug-only
 glCreateShaderProgramv
 glUseProgram
 glGetUniformLocation
@@ -5,9 +6,6 @@ glGenProgramPipelines
 glBindProgramPipeline
 glUseProgramStages
 glProgramUniform4fv
-glGenFramebuffers
-glBindFramebuffer
-glFramebufferTexture2D
 glCreateProgram
 glAttachShader
 glLinkProgram
@@ -16,14 +14,17 @@ glShaderSource
 glCompileShader
 glActiveTexture
 glGetProgramiv
-glGetProgramInfoLog
-glCheckFramebufferStatus
 glGetShaderiv
 glGetShaderInfoLog
 glBlitFramebuffer
-glDeleteProgram
 glUniform1i
 glUniform1f
 glUniform2f
 glUniform3f
 glUniform4f
++glGenFramebuffers
++glBindFramebuffer
++glFramebufferTexture2D
++glGetProgramInfoLog
++glCheckFramebufferStatus
++glDeleteProgram

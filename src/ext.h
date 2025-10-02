@@ -8,7 +8,11 @@
 #include <GL/gl.h>
 #include "glext.h"
 
+#ifdef DEBUG
 #define NUM_FUNCTIONS 29
+#else
+#define NUM_FUNCTIONS 23
+#endif
 
 extern void* myglfunc[NUM_FUNCTIONS];
 
@@ -19,28 +23,32 @@ extern void* myglfunc[NUM_FUNCTIONS];
 #define glBindProgramPipeline ((PFNGLBINDPROGRAMPIPELINEPROC)myglfunc[4])
 #define glUseProgramStages ((PFNGLUSEPROGRAMSTAGESPROC)myglfunc[5])
 #define glProgramUniform4fv ((PFNGLPROGRAMUNIFORM4FVPROC)myglfunc[6])
-#define glGenFramebuffers ((PFNGLGENFRAMEBUFFERSPROC)myglfunc[7])
-#define glBindFramebuffer ((PFNGLBINDFRAMEBUFFERPROC)myglfunc[8])
-#define glFramebufferTexture2D ((PFNGLFRAMEBUFFERTEXTURE2DPROC)myglfunc[9])
-#define glCreateProgram ((PFNGLCREATEPROGRAMPROC)myglfunc[10])
-#define glAttachShader ((PFNGLATTACHSHADERPROC)myglfunc[11])
-#define glLinkProgram ((PFNGLLINKPROGRAMPROC)myglfunc[12])
-#define glCreateShader ((PFNGLCREATESHADERPROC)myglfunc[13])
-#define glShaderSource ((PFNGLSHADERSOURCEPROC)myglfunc[14])
-#define glCompileShader ((PFNGLCOMPILESHADERPROC)myglfunc[15])
-#define glActiveTexture ((PFNGLACTIVETEXTUREPROC)myglfunc[16])
-#define glGetProgramiv ((PFNGLGETPROGRAMIVPROC)myglfunc[17])
-#define glGetProgramInfoLog ((PFNGLGETPROGRAMINFOLOGPROC)myglfunc[18])
-#define glCheckFramebufferStatus ((PFNGLCHECKFRAMEBUFFERSTATUSPROC)myglfunc[19])
-#define glGetShaderiv ((PFNGLGETSHADERIVPROC)myglfunc[20])
-#define glGetShaderInfoLog ((PFNGLGETSHADERINFOLOGPROC)myglfunc[21])
-#define glBlitFramebuffer ((PFNGLBLITFRAMEBUFFERPROC)myglfunc[22])
-#define glDeleteProgram ((PFNGLDELETEPROGRAMPROC)myglfunc[23])
-#define glUniform1i ((PFNGLUNIFORM1IPROC)myglfunc[24])
-#define glUniform1f ((PFNGLUNIFORM1FPROC)myglfunc[25])
-#define glUniform2f ((PFNGLUNIFORM2FPROC)myglfunc[26])
-#define glUniform3f ((PFNGLUNIFORM3FPROC)myglfunc[27])
-#define glUniform4f ((PFNGLUNIFORM4FPROC)myglfunc[28])
+#define glCreateProgram ((PFNGLCREATEPROGRAMPROC)myglfunc[7])
+#define glAttachShader ((PFNGLATTACHSHADERPROC)myglfunc[8])
+#define glLinkProgram ((PFNGLLINKPROGRAMPROC)myglfunc[9])
+#define glCreateShader ((PFNGLCREATESHADERPROC)myglfunc[10])
+#define glShaderSource ((PFNGLSHADERSOURCEPROC)myglfunc[11])
+#define glCompileShader ((PFNGLCOMPILESHADERPROC)myglfunc[12])
+#define glActiveTexture ((PFNGLACTIVETEXTUREPROC)myglfunc[13])
+#define glGetProgramiv ((PFNGLGETPROGRAMIVPROC)myglfunc[14])
+#define glGetShaderiv ((PFNGLGETSHADERIVPROC)myglfunc[15])
+#define glGetShaderInfoLog ((PFNGLGETSHADERINFOLOGPROC)myglfunc[16])
+#define glBlitFramebuffer ((PFNGLBLITFRAMEBUFFERPROC)myglfunc[17])
+#define glUniform1i ((PFNGLUNIFORM1IPROC)myglfunc[18])
+#define glUniform1f ((PFNGLUNIFORM1FPROC)myglfunc[19])
+#define glUniform2f ((PFNGLUNIFORM2FPROC)myglfunc[20])
+#define glUniform3f ((PFNGLUNIFORM3FPROC)myglfunc[21])
+#define glUniform4f ((PFNGLUNIFORM4FPROC)myglfunc[22])
+
+#ifdef DEBUG
+#define glGenFramebuffers ((PFNGLGENFRAMEBUFFERSPROC)myglfunc[23])
+#define glBindFramebuffer ((PFNGLBINDFRAMEBUFFERPROC)myglfunc[24])
+#define glFramebufferTexture2D ((PFNGLFRAMEBUFFERTEXTURE2DPROC)myglfunc[25])
+#define glGetProgramInfoLog ((PFNGLGETPROGRAMINFOLOGPROC)myglfunc[26])
+#define glCheckFramebufferStatus ((PFNGLCHECKFRAMEBUFFERSTATUSPROC)myglfunc[27])
+#define glDeleteProgram ((PFNGLDELETEPROGRAMPROC)myglfunc[28])
+
+#endif
 
 int EXT_Init(void);
 
