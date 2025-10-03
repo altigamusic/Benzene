@@ -1,6 +1,22 @@
 import os
-from re import sub
 import subprocess
+from dataclasses import dataclass
+
+
+@dataclass
+class Keyframe:
+    time: int
+    values: list[float]
+    interpolation: int
+    tension: float
+
+
+@dataclass
+class Uniform:
+    name: str
+    type: str
+    keyframes: list[Keyframe]
+
 
 UNIFORM_TYPE_TO_GL_FUNCTION = {
     "float": "glUniform1f",
@@ -44,7 +60,7 @@ def parse_keyframe(keyframe_string):
     tension = round(getCorrectedTension(float(tension), interpolation))
     values = [float(v) for v in value.split("/")]
 
-    return time, values, interpolation, tension
+    return Keyframe(time, values, interpolation, tension)
 
 
 def parse_uniforms_file(filename):
@@ -60,27 +76,26 @@ def parse_uniforms_file(filename):
                 continue
 
             keyframes = list(filter(bool, map(parse_keyframe, parts[2:])))
-            uniforms.append({"name": parts[0], "type": parts[1], "keyframes": keyframes})
+            uniforms.append(Uniform(name=parts[0], type=parts[1], keyframes=keyframes))
 
     return uniforms
 
 
-def keyframe_to_array(keyframe, idx):
-    time, values, interpolation, tension = keyframe
-    return f"{{{time}, {values[idx]:.6f}f, {interpolation}, {tension}}}"
+def keyframe_to_array_string(keyframe: Keyframe, idx: int):
+    return f"{{{keyframe.time}, {keyframe.values[idx]:.6f}f, {keyframe.interpolation}, {keyframe.tension}}}"
 
 
-def number_of_params(uniform):
-    if uniform["type"] == "float":
+def number_of_params(uniform: Uniform):
+    if uniform.type == "float":
         return 1
-    elif uniform["type"] == "vec2":
+    elif uniform.type == "vec2":
         return 2
-    elif uniform["type"] in ("vec3", "color"):
+    elif uniform.type in ("vec3", "color"):
         return 3
-    elif uniform["type"] == "vec4":
+    elif uniform.type == "vec4":
         return 4
     else:
-        raise ValueError(f"Unsupported uniform type: {uniform['type']}")
+        raise ValueError(f"Unsupported uniform type: {uniform.type}")
 
 
 def gen_keyframe_arrays(uniforms):
@@ -89,7 +104,7 @@ def gen_keyframe_arrays(uniforms):
 
     for uniform in uniforms:
         for i in range(number_of_params(uniform)):
-            kf_array = ", ".join(keyframe_to_array(kf, i) for kf in uniform["keyframes"])
+            kf_array = ", ".join(keyframe_to_array_string(kf, i) for kf in uniform.keyframes)
 
             if len(kf_array) > 0:
                 arrays.append(f"Keyframe keyframes{index}[] = {{{kf_array}}};")
@@ -105,24 +120,23 @@ def generate_release_file_code(uniforms):
 
     # Generate uniform location assignments
     uniform_locations = "\n".join(
-        f'    UNIFORMS[{i}] = glGetUniformLocation(program, VAR_{uniform["name"]});' for i, uniform in enumerate(uniforms)
+        f"    UNIFORMS[{i}] = glGetUniformLocation(program, VAR_{uniform.name});" for i, uniform in enumerate(uniforms)
     )
 
     kf_index = 0
     updates = []
 
     for i, uniform in enumerate(uniforms):
-        gl_func = UNIFORM_TYPE_TO_GL_FUNCTION.get(uniform["type"])
+        gl_func = UNIFORM_TYPE_TO_GL_FUNCTION.get(uniform.type)
 
         if not gl_func:
-            raise ValueError(f"Unsupported uniform type: {uniform['type']}")
+            raise ValueError(f"Unsupported uniform type: {uniform.type}")
 
-        number_of_keyframes = len(uniform["keyframes"])
+        number_of_keyframes = len(uniform.keyframes)
         if number_of_keyframes == 0:
             params = ["0.0f"] * number_of_params(uniform)
         else:
-            params = [
-                f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
+            params = [f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
         param_string = ",".join(params)
         kf_index += len(params)
 
@@ -159,7 +173,7 @@ def generate_minified_shader(shader_filename, uniforms, output_filename, resolut
     with open(shader_filename, "r") as f:
         shader_code = f.read()
 
-    uniform_definitions = [f"uniform {uniform['type']} {uniform['name']};" for uniform in uniforms]
+    uniform_definitions = [f"uniform {uniform.type} {uniform.name};" for uniform in uniforms]
     uniform_definition_code = "\n".join(uniform_definitions)
 
     injected_code = f"""#version 330
