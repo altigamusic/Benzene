@@ -1,6 +1,7 @@
 import os
 import subprocess
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -18,6 +19,14 @@ class Uniform:
     keyframes: list[Keyframe]
 
 
+@dataclass
+class Const:
+    name: str
+    type: str
+    value: str
+
+
+SHOULD_INJECT_CONSTS = True  # TODO: Check if this is efficient
 UNIFORM_TYPE_TO_GL_FUNCTION = {
     "float": "glUniform1f",
     "vec2": "glUniform2f",
@@ -114,6 +123,35 @@ def gen_keyframe_arrays(uniforms):
     return arrays
 
 
+def keyframe_values_to_const_value(type: str, values: list[float]):
+    if type == "float":
+        return f"{values[0]:.6f}"
+    elif type == "vec2":
+        return f"vec2({values[0]:.6f},{values[1]:.6f})"
+    elif type in ("vec3", "color"):
+        return f"vec3({values[0]:.6f}, {values[1]:.6f}, {values[2]:.6f})"
+    elif type == "vec4":
+        return f"vec4({values[0]:.6f}, {values[1]:.6f}, {values[2]:.6f}, {values[3]:.6f})"
+    else:
+        return "0.0"
+
+
+def uniform_to_const(uniform: Uniform):
+    try:
+        keyframe_values = uniform.keyframes[0].values
+    except IndexError:
+        keyframe_values = [0] * number_of_params(uniform)
+
+    return Const(uniform.name, uniform.type, keyframe_values_to_const_value(uniform.type, keyframe_values))
+
+
+def split_animated_and_const_uniforms(uniforms: list[Uniform]):
+    animated_uniforms = [uniform for uniform in uniforms if len(uniform.keyframes) > 1]
+    consts = [uniform for uniform in uniforms if len(uniform.keyframes) <= 1]
+
+    return animated_uniforms, list(map(uniform_to_const, consts))
+
+
 def generate_release_file_code(uniforms):
     # Generate all keyframe array declarations
     keyframe_arrays = "\n".join(gen_keyframe_arrays(uniforms))
@@ -169,16 +207,20 @@ def generate_release_file(uniforms, output_filename):
         f.write(release_file_code)
 
 
-def generate_minified_shader(shader_filename, uniforms, output_filename, resolution=(800, 600)):
+def generate_minified_shader(shader_filename, uniforms: list[Uniform], consts: list[Const], output_filename, resolution=(800, 600)):
     with open(shader_filename, "r") as f:
         shader_code = f.read()
 
     uniform_definitions = [f"uniform {uniform.type} {uniform.name};" for uniform in uniforms]
     uniform_definition_code = "\n".join(uniform_definitions)
 
+    const_definitions = [f"const {const.type} {const.name} = {const.value};" for const in consts]
+    const_definition_code = "\n".join(const_definitions)
+
     injected_code = f"""#version 330
 uniform float _t;
 {uniform_definition_code}
+{const_definition_code}
 const vec2 _res = vec2({resolution[0]}, {resolution[1]});
 vec2 fragCoord = gl_FragCoord.xy;
 {shader_code}
@@ -208,10 +250,15 @@ def main():
 
     uniforms = parse_uniforms_file(uniforms_filename)
 
-    generate_release_file(uniforms, output_filename)
+    if SHOULD_INJECT_CONSTS:
+        animated_uniforms, consts = split_animated_and_const_uniforms(uniforms)
+    else:
+        animated_uniforms, consts = uniforms, []
+
+    generate_release_file(animated_uniforms, output_filename)
     print(f"Generated {output_filename}")
 
-    generate_minified_shader(shader_source_filename, uniforms, shader_output_filename)
+    generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename)
     print(f"Generated {shader_output_filename}")
 
 
