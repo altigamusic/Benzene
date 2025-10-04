@@ -810,6 +810,9 @@ bool renderTimelines(int* time, int maxTime)
 
     for (const Uniform& uniform : uniformList)
     {
+        // Display timelines only for animated uniforms, i.e. uniforms with 2+ keyframes
+        if (uniform.keyframes.size() <= 1) continue;
+
         std::vector<int> keyframes;
 
         for (const UniformKeyframe& keyframe : uniform.keyframes)
