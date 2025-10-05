@@ -32,6 +32,8 @@ const char* uniformFileName = "uniforms.txt";
 
 bool showDemoWindow;
 
+int demoTimeLength = 140000;
+
 void resizeWindow(int width, int height)
 {
     windowWidth = width;
@@ -981,7 +983,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         bool shouldRerender = isPlaying;
 
-        if (handleKeyScrubbing(t, 140000))
+        if (handleKeyScrubbing(t, demoTimeLength))
         {
             isPlaying = false;
             shouldRerender = true;
@@ -998,7 +1000,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             shouldRerender = true;
         }
 
-        if (renderTimelines(&t, 140000))
+        if (renderTimelines(&t, demoTimeLength))
         {
             shouldRerender = true;
             frames = -1;
