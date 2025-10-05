@@ -810,7 +810,7 @@ bool renderTimelines(int* time, int maxTime)
 
     didChange |= TimeSlider("Time", time, 0, maxTime);
 
-    for (const Uniform& uniform : uniformList)
+    for (Uniform& uniform : uniformList)
     {
         // Display timelines only for animated uniforms, i.e. uniforms with 2+ keyframes
         if (uniform.keyframes.size() <= 1) continue;
@@ -820,7 +820,21 @@ bool renderTimelines(int* time, int maxTime)
         for (const UniformKeyframe& keyframe : uniform.keyframes)
             keyframes.push_back(static_cast<int>(keyframe.time));
 
-        didChange |= KeyframeSlider(uniform.name.c_str(), time, 0, maxTime, keyframes);
+        KeyframeMovementData kfMovement;
+
+        if (KeyframeSlider(uniform.name.c_str(), time, 0, maxTime, keyframes, &kfMovement))
+        {
+            didChange = true;
+
+            if (kfMovement.index >= 0)
+            {
+                // Move the keyframe - prevent overlapping by restricting the bounds
+                int minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
+                int maxValue = kfMovement.index == keyframes.size() - 1 ? demoTimeLength : (keyframes[kfMovement.index + 1] - 1);
+
+                uniform.keyframes[kfMovement.index].time = std::clamp(kfMovement.newTime, minValue, maxValue);
+            }
+        }
     }
 
     return didChange;

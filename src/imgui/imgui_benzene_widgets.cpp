@@ -61,14 +61,17 @@ bool DragVector2(
     return value_changed;
 }
 
-bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<int>& keyframes)
+bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<int>& keyframes, KeyframeMovementData* movement)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_FrameBg);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
     const ImU32 KEYFRAME_OUTLINE_COLOR = GetColorU32(ImGuiCol_SliderGrabActive);
     const ImU32 KEYFRAME_INACTIVE_COLOR = GetColorU32(ImGuiCol_WindowBg);
     const ImU32 KEYFRAME_ACTIVE_COLOR = IM_COL32(0, 200, 0, 255);
+    const ImU32 KEYFRAME_DRAGGED_COLOR = IM_COL32(100, 200, 200, 255);
     const int SNAP_THRESHOLD_PIXELS = 4;
+
+    static int draggedKeyframeIndex = -1; // This works because only one keyframe in one slider can be dragged at a time
 
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems) return false;
@@ -84,29 +87,55 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
     int snapThresholdValue = static_cast<int>(SNAP_THRESHOLD_PIXELS / size.x * (max - min));
 
     bool value_changed = false;
+    bool pressed = InvisibleButton(label, fullSize, ImGuiButtonFlags_PressedOnClick);
 
-    if (!InvisibleButton(label, fullSize) && IsItemActive())
+    if (pressed || IsItemActive())
     {
         ImVec2 relativePos = GetIO().MousePos - pos;
         float ratio = relativePos.x / size.x;
         ratio = ImClamp(ratio, 0.0f, 1.0f);
-
         int new_value = static_cast<int>(min + ratio * (max - min));
 
-        for (int kf : keyframes)
+        if (pressed)
         {
-            if (abs(kf - new_value) <= snapThresholdValue)
+            // Check if a keyframe is being dragged
+            auto kf = std::find_if(keyframes.begin(), keyframes.end(),
+                [new_value, snapThresholdValue](int kf) { return abs(kf - new_value) <= snapThresholdValue; });
+
+            draggedKeyframeIndex = kf == keyframes.end() ? -1 : kf - keyframes.begin();
+        }
+        else
+        {
+            if (draggedKeyframeIndex < 0)
             {
-                new_value = kf;
-                break; // This could cause problems if two keyframes are very close to each other, fix later
+                // Move the time slider
+                for (int kf : keyframes)
+                {
+                    if (abs(kf - new_value) <= snapThresholdValue)
+                    {
+                        new_value = kf;
+                        break; // This could cause problems if two keyframes are very close to each other, fix later
+                    }
+                }
+
+                if (new_value != *data)
+                {
+                    *data = new_value;
+                    value_changed = true;
+                }
+            }
+            else if (movement != nullptr)
+            {
+                // Move the dragged keyframe
+                movement->index = draggedKeyframeIndex;
+                movement->newTime = new_value;
+                value_changed = keyframes[draggedKeyframeIndex] != new_value;
             }
         }
-
-        if (new_value != *data)
-        {
-            *data = new_value;
-            value_changed = true;
-        }
+    }
+    else
+    {
+        draggedKeyframeIndex = -1;
     }
 
     // Render timeline
@@ -137,7 +166,10 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
         ImVec2 rhombus_points[4] = {rhombus_center + ImVec2(0, -KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(KEYFRAME_SIZE * 0.5f, 0),
             rhombus_center + ImVec2(0, KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(-KEYFRAME_SIZE * 0.5f, 0)};
 
-        draw_list->AddConvexPolyFilled(rhombus_points, 4, (kf == *data) ? KEYFRAME_ACTIVE_COLOR : KEYFRAME_INACTIVE_COLOR);
+        bool isBeingDragged = draggedKeyframeIndex >= 0 && kf == keyframes[draggedKeyframeIndex];
+        auto keyframeColor = isBeingDragged ? KEYFRAME_DRAGGED_COLOR : (kf == *data) ? KEYFRAME_ACTIVE_COLOR : KEYFRAME_INACTIVE_COLOR;
+
+        draw_list->AddConvexPolyFilled(rhombus_points, 4, keyframeColor);
 
         draw_list->AddPolyline(rhombus_points, 4, KEYFRAME_OUTLINE_COLOR, ImDrawFlags_Closed, 2.);
     }
@@ -145,6 +177,8 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
     // Render label
     ImVec2 label_pos = pos + ImVec2(size.x + g.Style.FramePadding.x, g.Style.FramePadding.y);
     draw_list->AddText(label_pos, GetColorU32(ImGuiCol_Text), label);
+
+    if (movement != nullptr) movement->index = draggedKeyframeIndex;
 
     return value_changed;
 }
