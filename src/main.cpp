@@ -15,6 +15,7 @@
 #include <iomanip>
 #include <windows.h>
 #include "CameraController.h"
+#include "CameraKeyframeController.h"
 #include "uniform.h"
 #include <regex>
 #include "imgui/imgui_benzene_widgets.h"
@@ -27,7 +28,7 @@ int viewportWidth = 800;
 int viewportHeight = 600;
 int timelineWidth;
 int timelineHeight = 200;
-CameraController cameraController;
+CameraKeyframeController cameraController;
 const char* uniformFileName = "uniforms.txt";
 
 bool showDemoWindow;
@@ -305,8 +306,11 @@ void updateUniforms(long timeInMs)
     glUniform2f(resolutionLocation, viewportWidth, viewportHeight);
     glUniform2f(windowOffsetLocation, sidebarWidth, timelineHeight);
 
-    glUniform3f(cameraPositionLocation, cameraController.position.x, cameraController.position.y, cameraController.position.z);
-    glUniform3f(cameraTargetLocation, cameraController.target.x, cameraController.target.y, cameraController.target.z);
+    vec3 cp = cameraController.getPosition();
+    vec3 ct = cameraController.getTarget();
+
+    glUniform3f(cameraPositionLocation, cp.x, cp.y, cp.z);
+    glUniform3f(cameraTargetLocation, ct.x, ct.y, ct.z);
 
     for (Uniform& uniform : uniformList)
     {
@@ -810,6 +814,32 @@ bool renderTimelines(int* time, int maxTime)
 
     didChange |= TimeSlider("Time", time, 0, maxTime);
 
+    if (cameraController.positionUniform.keyframes.size() > 1)
+    {
+        // Camera slider is special because it's controlled differently
+        // Camera position and camera target have the same keyframes
+        std::vector<int> keyframes;
+
+        for (const UniformKeyframe& keyframe : cameraController.positionUniform.keyframes)
+            keyframes.push_back(static_cast<int>(keyframe.time));
+
+        KeyframeMovementData kfMovement;
+        if (KeyframeSlider("Camera", time, 0, maxTime, keyframes, &kfMovement))
+        {
+            if (kfMovement.index >= 0)
+            {
+                int minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
+                int maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
+                int newTime = std::clamp(kfMovement.newTime, minValue, maxValue);
+
+                cameraController.positionUniform.keyframes[kfMovement.index].time = newTime;
+                cameraController.targetUniform.keyframes[kfMovement.index].time = newTime;
+            }
+
+            didChange = true;
+        }
+    }
+
     for (Uniform& uniform : uniformList)
     {
         // Display timelines only for animated uniforms, i.e. uniforms with 2+ keyframes
@@ -824,16 +854,16 @@ bool renderTimelines(int* time, int maxTime)
 
         if (KeyframeSlider(uniform.name.c_str(), time, 0, maxTime, keyframes, &kfMovement))
         {
-            didChange = true;
-
             if (kfMovement.index >= 0)
             {
                 // Move the keyframe - prevent overlapping by restricting the bounds
                 int minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
-                int maxValue = kfMovement.index == keyframes.size() - 1 ? demoTimeLength : (keyframes[kfMovement.index + 1] - 1);
+                int maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
 
                 uniform.keyframes[kfMovement.index].time = std::clamp(kfMovement.newTime, minValue, maxValue);
             }
+
+            didChange = true;
         }
     }
 
@@ -981,7 +1011,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (isPlaying) t += timeDelta;
         prevTime = currentTime;
 
-        cameraController.resetCameraMovementCheck();
+        cameraController.startFrame(t);
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {

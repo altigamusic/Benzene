@@ -1,4 +1,6 @@
 #pragma once
+#include <windows.h>
+#include "gl/GL.h"
 #include <string>
 #include <vector>
 #include "uniform_data_types.h"
@@ -27,6 +29,7 @@ class Uniform
     void setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation = KeyframeInterpolation::Linear,
         float interpolationFactor = 0.0f);
     UniformKeyframe* getKeyframeAtTime(float time);
+    bool hasKeyframeAtTime(float time) const;
     bool removeKeyframeAtTime(float time);
     void setConstantValue(const UniformValue& value);
 };

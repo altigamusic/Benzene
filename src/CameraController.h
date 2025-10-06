@@ -1,3 +1,5 @@
+#pragma once
+
 #include "intro.h"
 #include "windows.h"
 #include <math.h>
@@ -81,6 +83,8 @@ class CameraController
 
     void recalculateCameraPosition();
 
+    void resetCamera();
+
     void handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     void moveForward(float amount);
@@ -100,6 +104,4 @@ class CameraController
     void resetCameraMovementCheck();
 
     bool didCameraMove() const;
-
-    void displayImGuiWindow();
 };

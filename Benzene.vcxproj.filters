@@ -34,6 +34,7 @@
     <ClCompile Include="src\generated\release.cpp">
       <Filter>Auto-Generated</Filter>
     </ClCompile>
+    <ClCompile Include="src\CameraKeyframeController.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ext.h" />
@@ -73,6 +74,7 @@
     </ClInclude>
     <ClInclude Include="src\uniform_data_types.h" />
     <ClInclude Include="src\release.h" />
+    <ClInclude Include="src\CameraKeyframeController.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ImGui">

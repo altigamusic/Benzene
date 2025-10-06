@@ -176,6 +176,12 @@ UniformKeyframe* Uniform::getKeyframeAtTime(float time)
     return result != keyframes.end() ? &(*result) : nullptr;
 }
 
+bool Uniform::hasKeyframeAtTime(float time) const
+{
+    auto result = std::find_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+    return result != keyframes.end();
+}
+
 bool Uniform::removeKeyframeAtTime(float time)
 {
     auto it = std::remove_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });

@@ -49,6 +49,14 @@ void CameraController::recalculateCameraPosition()
     position = target - direction * 10;
 }
 
+void CameraController::resetCamera()
+{
+    position = {0, 0, 10};
+    target = {0, 0, 0};
+    recalculateAnglesFromTarget();
+    _didCameraMove = true;
+}
+
 void CameraController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     static POINTS start;
@@ -205,25 +213,4 @@ void CameraController::resetCameraMovementCheck() { _didCameraMove = false; }
 bool CameraController::didCameraMove() const
 {
     return _didCameraMove || movementX != 0 || movementY != 0 || movementZ != 0 || movementToTarget != 0;
-}
-
-void CameraController::displayImGuiWindow()
-{
-    ImGui::SeparatorText("Camera");
-    ImGui::BeginChild("Camera");
-    ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", position.x, position.y, position.z);
-    ImGui::Text("Camera Target: %.2f, %.2f, %.2f", target.x, target.y, target.z);
-    ImGui::Text(
-        "Camera Direction: %.2f, %.2f, %.2f", target.x - position.x, target.y - position.y, target.z - position.z);
-
-    if (ImGui::Button("Reset Camera"))
-    {
-        position = {0, 0, 10};
-        target = {0, 0, 0};
-        recalculateAnglesFromTarget();
-        _didCameraMove = true;
-    }
-
-    ImGui::SliderFloat("Movement Scale", &movementScale, 1, 10);
-    ImGui::EndChild();
 }
