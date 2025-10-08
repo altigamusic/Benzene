@@ -15,3 +15,5 @@ bool DragVector2(const char* label, ImVec2* v, float v_speed = 1.0f, const ImVec
 bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<int>& keyframes, KeyframeMovementData* movement);
 bool TimeSlider(const char* label, int* data, int min, int max);
 bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension);
+
+bool PlayPauseButton(bool shouldDrawPauseIcon);

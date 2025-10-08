@@ -9,6 +9,27 @@
 
 using namespace ImGui;
 
+static bool InvisibleButton(const char* str_id, const ImVec2& size_arg, bool* hovered, bool* held, ImGuiButtonFlags flags = 0)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems) return false;
+
+    // Cannot use zero-size for InvisibleButton(). Unlike Button() there is not way to fallback using the label size.
+    IM_ASSERT(size_arg.x != 0.0f && size_arg.y != 0.0f);
+
+    const ImGuiID id = window->GetID(str_id);
+    ImVec2 size = CalcItemSize(size_arg, 0.0f, 0.0f);
+    const ImRect bb(window->DC.CursorPos, window->DC.CursorPos + size);
+    ItemSize(size);
+    if (!ItemAdd(bb, id)) return false;
+
+    bool pressed = ButtonBehavior(bb, id, hovered, held, flags);
+
+    IMGUI_TEST_ENGINE_ITEM_INFO(id, str_id, g.LastItemData.StatusFlags);
+    return pressed;
+}
+
 bool DragVector2(
     const char* label, ImVec2* v, float v_speed, const ImVec2* v_min, const ImVec2* v_max, const char* format, ImGuiSliderFlags flags)
 {
@@ -318,4 +339,44 @@ bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interp
     }
 
     return pressed;
+}
+
+bool PlayPauseButton(bool shouldDrawPauseIcon)
+{
+    // Draw play/pause icons using ImGui's draw list
+    ImVec2 buttonSize(24, 24);
+    ImVec2 iconSize(10, 10);
+    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+
+    bool hovered, held;
+    bool didChange = InvisibleButton("##PlayPause", buttonSize, &hovered, &held);
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
+
+    drawList->AddRectFilled(cursorPos, cursorPos + buttonSize, GetColorU32(hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg));
+
+    ImVec2 pad = (buttonSize - iconSize) / 2;
+
+    if (shouldDrawPauseIcon)
+    {
+        // Draw Pause icon: two vertical bars
+        float barWidth = 4.0f;
+        ImVec2 p1 = cursorPos + pad;
+        ImVec2 p2 = p1 + ImVec2(barWidth, iconSize.y);
+        ImVec2 p3 = ImVec2(p1.x + iconSize.x - barWidth, p1.y);
+        ImVec2 p4 = p1 + iconSize;
+        drawList->AddRectFilled(p1, p2, color);
+        drawList->AddRectFilled(p3, p4, color);
+    }
+    else
+    {
+        // Draw Play icon: right-pointing triangle
+        ImVec2 p1 = cursorPos + pad;
+        ImVec2 p2 = ImVec2(p1.x, p1.y + iconSize.y);
+        ImVec2 p3 = ImVec2(p1.x + iconSize.x, p1.y + iconSize.y / 2.f);
+        drawList->AddTriangleFilled(p1, p2, p3, color);
+    }
+
+    return didChange;
 }

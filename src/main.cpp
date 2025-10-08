@@ -1008,7 +1008,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
-        if (ImGui::Button(isPlaying ? "Pause" : "Play"))
+        if (PlayPauseButton(isPlaying))
         {
             isPlaying = !isPlaying;
             shouldRerender = true;
