@@ -862,44 +862,48 @@ int findNextKeyframe(int t, const std::vector<int>& keyframes)
     return -1; // No next keyframe
 }
 
-bool handleKeyScrubbing(int& t, int maxTimelineTime)
+bool handleKeyScrubbing(int& t, int maxTimelineTime, bool backButton, bool forwardButton)
 {
     ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureKeyboard) return false;
+    if (io.WantCaptureKeyboard && !backButton && !forwardButton) return false;
 
     // Get sorted list of all keyframes
     std::vector<int> keyframes = getAllKeyframes();
 
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || backButton)
     {
-        if (!io.KeyCtrl)
+        if (io.KeyCtrl || backButton)
+        {
+            int prevKeyframe = findPreviousKeyframe(t, keyframes);
+
+            if (prevKeyframe != -1)
+            {
+                t = prevKeyframe;
+                return true;
+            }
+        }
+        else
         {
             t = max(0, t - 100);
             return true;
         }
-
-        int prevKeyframe = findPreviousKeyframe(t, keyframes);
-
-        if (prevKeyframe != -1)
-        {
-            t = prevKeyframe;
-            return true;
-        }
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
+    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || forwardButton)
     {
-        if (!io.KeyCtrl)
+        if (io.KeyCtrl || forwardButton)
+        {
+            int nextKeyframe = findNextKeyframe(t, keyframes);
+
+            if (nextKeyframe != -1)
+            {
+                t = nextKeyframe;
+                return true;
+            }
+        }
+        else
         {
             t = min(maxTimelineTime, t + 100);
-            return true;
-        }
-
-        int nextKeyframe = findNextKeyframe(t, keyframes);
-
-        if (nextKeyframe != -1)
-        {
-            t = nextKeyframe;
             return true;
         }
     }
@@ -997,20 +1001,25 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         bool shouldRerender = isPlaying;
 
-        if (handleKeyScrubbing(t, demoTimeLength))
-        {
-            isPlaying = false;
-            shouldRerender = true;
-        }
-
         ImGui::SetNextWindowPos(ImVec2(0, viewportHeight), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
+        bool backButton = ImGui::Button("Prev");
+        ImGui::SameLine();
+        bool forwardButton = ImGui::Button("Next");
+        ImGui::SameLine();
+
         if (PlayPauseButton(isPlaying))
         {
             isPlaying = !isPlaying;
+            shouldRerender = true;
+        }
+
+        if (handleKeyScrubbing(t, demoTimeLength, backButton, forwardButton))
+        {
+            isPlaying = false;
             shouldRerender = true;
         }
 
