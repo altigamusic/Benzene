@@ -557,7 +557,7 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
             didThisUniformChange = DragVector2(uniform.name.c_str(), (ImVec2*)(&value.v2), 0.005f);
             break;
         case UniformType::Color:
-            didThisUniformChange = ImGui::ColorPicker3(uniform.name.c_str(), value.v3);
+            didThisUniformChange = ImGui::ColorEdit3(uniform.name.c_str(), value.v3);
             break;
         }
 
