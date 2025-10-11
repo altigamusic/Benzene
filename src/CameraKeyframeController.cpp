@@ -73,8 +73,13 @@ void CameraKeyframeController::recalculateCameraTarget() { cameraController.reca
 void CameraKeyframeController::handleKeyDown(WPARAM wParam) { cameraController.handleKeyDown(wParam); }
 void CameraKeyframeController::handleKeyUp(WPARAM wParam) { cameraController.handleKeyUp(wParam); }
 void CameraKeyframeController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    bool isOnKeyframe = positionUniform.hasKeyframeAtTime(currentTime);
+
+    if (!isLocked || isOnKeyframe)
     {
         cameraController.handleMouseMovement(hwndMain, uMsg, wParam, lParam);
+    }
 }
 
 vec3 CameraKeyframeController::getPosition() { return cameraController.position; }
