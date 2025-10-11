@@ -30,6 +30,7 @@ class CameraKeyframeController
 
     vec3 getPosition();
     vec3 getTarget();
+    vec3 getRotation();
 
     Uniform positionUniform;
     Uniform rotationUniform;

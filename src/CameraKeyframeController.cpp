@@ -91,6 +91,7 @@ void CameraKeyframeController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPA
 
 vec3 CameraKeyframeController::getPosition() { return cameraController.position; }
 vec3 CameraKeyframeController::getTarget() { return cameraController.target; }
+vec3 CameraKeyframeController::getRotation() { return {cameraController.xAngle, cameraController.yAngle, 0}; }
 
 void CameraKeyframeController::displayKeyframeMarker()
 {

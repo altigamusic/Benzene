@@ -60,6 +60,7 @@ static GLuint windowOffsetLocation = -1;
 
 static GLuint cameraPositionLocation = -1;
 static GLuint cameraTargetLocation = -1;
+static GLuint cameraRotationLocation = -1;
 
 std::string currentShader;
 std::vector<Uniform> uniformList;
@@ -228,7 +229,7 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
         "#version 330\n"
         "uniform vec2 _res, _windowOffset;\n"
         "uniform float _t;\n"
-        "uniform vec3 _cp, _ct;\n"
+        "uniform vec3 _cp, _ct, _cr;\n"
         "vec2 fragCoord = gl_FragCoord.xy - _windowOffset;\n" +
         generateUniformCode() + fragmentShaderSource;
 
@@ -267,6 +268,7 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
     windowOffsetLocation = glGetUniformLocation(fragmentShaderProgram, "_windowOffset");
     cameraPositionLocation = glGetUniformLocation(fragmentShaderProgram, "_cp");
     cameraTargetLocation = glGetUniformLocation(fragmentShaderProgram, "_ct");
+    cameraRotationLocation = glGetUniformLocation(fragmentShaderProgram, "_cr");
 
     resizeWindow(windowWidth, windowHeight);
 
@@ -316,9 +318,11 @@ void updateUniforms(long timeInMs)
 
     vec3 cp = cameraController.getPosition();
     vec3 ct = cameraController.getTarget();
+    vec3 cr = cameraController.getRotation();
 
     glUniform3f(cameraPositionLocation, cp.x, cp.y, cp.z);
     glUniform3f(cameraTargetLocation, ct.x, ct.y, ct.z);
+    glUniform3f(cameraRotationLocation, cr.x, cr.y, cr.z);
 
     for (Uniform& uniform : uniformList)
     {

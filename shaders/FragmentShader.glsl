@@ -30,7 +30,8 @@ vec2 raycast(vec3 ro, vec3 rd) {
 
 void main() {
     vec2 uv = (fragCoord / _res - 0.5) / vec2(_res.y / _res.x, 1);
-    vec3 ro = _cp, cw = normalize(_ct - ro), cu = normalize(cross(cw, vec3(0, 1, 0))), cv = normalize(cross(cu, cw)), rd = mat3(cu, cv, cw) * normalize(vec3(uv, .5)), ld = normalize(vec3(-.1, .4, .3)), co, fo;
+    float xS = sin(_cr.x), xC = cos(_cr.x), yS = sin(_cr.y), yC = cos(_cr.y);
+    vec3 ro = _cp, rd = mat3(-xC, 0, -xS, -xS * yS, yC, xC * yS, -xS * yC, -yS, xC * yC) * normalize(vec3(uv, .5)), ld = normalize(vec3(-.1, .4, .3)), co, fo;
     co = fo = vec3(.1, .1, .1) - length(uv) * .1;
     vec2 t = raycast(ro, rd);
     
