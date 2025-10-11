@@ -129,6 +129,70 @@ std::string generateUniformCode()
     return uniformStream.str();
 }
 
+void saveSingleUniformToFile(std::ofstream& file, const Uniform& uniform)
+{
+    file << uniform.name;
+
+    switch (uniform.type)
+    {
+    case UniformType::Float:
+        file << ";float;";
+        break;
+    case UniformType::Int:
+        file << ";int;";
+        break;
+    case UniformType::Bool:
+        file << ";bool;";
+        break;
+    case UniformType::Vec2:
+        file << ";vec2;";
+        break;
+    case UniformType::Vec3:
+        file << ";vec3;";
+        break;
+    case UniformType::Color:
+        file << ";color;";
+        break;
+    case UniformType::Vec4:
+        file << ";vec4;";
+        break;
+    }
+
+    for (auto& keyframe : uniform.keyframes)
+    {
+        file << (int)keyframe.time << ",";
+
+        switch (uniform.type)
+        {
+        case UniformType::Float:
+            file << std::fixed << std::setprecision(6) << keyframe.value.f;
+            break;
+        case UniformType::Int:
+            file << keyframe.value.i;
+            break;
+        case UniformType::Bool:
+            file << (keyframe.value.b ? "true" : "false");
+            break;
+        case UniformType::Vec2:
+            file << std::fixed << std::setprecision(6) << keyframe.value.v2[0] << "/" << keyframe.value.v2[1];
+            break;
+        case UniformType::Vec3:
+            file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
+            break;
+        case UniformType::Color:
+            file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
+            break;
+        case UniformType::Vec4:
+            file << keyframe.value.v4[0] << "/" << keyframe.value.v4[1] << "/" << keyframe.value.v4[2] << "/" << keyframe.value.v4[3];
+            break;
+        }
+
+        file << "," << keyframe.interpolationToNumber() << "," << keyframe.interpolationFactor << ";";
+    }
+
+    file << "\n";
+}
+
 void saveUniformsToFile(const std::string& filename)
 {
     std::ofstream file(filename);
@@ -140,67 +204,11 @@ void saveUniformsToFile(const std::string& filename)
 
     for (const Uniform& uniform : uniformList)
     {
-        file << uniform.name;
-
-        switch (uniform.type)
-        {
-        case UniformType::Float:
-            file << ";float;";
-            break;
-        case UniformType::Int:
-            file << ";int;";
-            break;
-        case UniformType::Bool:
-            file << ";bool;";
-            break;
-        case UniformType::Vec2:
-            file << ";vec2;";
-            break;
-        case UniformType::Vec3:
-            file << ";vec3;";
-            break;
-        case UniformType::Color:
-            file << ";color;";
-            break;
-        case UniformType::Vec4:
-            file << ";vec4;";
-            break;
-        }
-
-        for (auto& keyframe : uniform.keyframes)
-        {
-            file << (int)keyframe.time << ",";
-
-            switch (uniform.type)
-            {
-            case UniformType::Float:
-                file << std::fixed << std::setprecision(6) << keyframe.value.f;
-                break;
-            case UniformType::Int:
-                file << keyframe.value.i;
-                break;
-            case UniformType::Bool:
-                file << (keyframe.value.b ? "true" : "false");
-                break;
-            case UniformType::Vec2:
-                file << std::fixed << std::setprecision(6) << keyframe.value.v2[0] << "/" << keyframe.value.v2[1];
-                break;
-            case UniformType::Vec3:
-                file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
-                break;
-            case UniformType::Color:
-                file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
-                break;
-            case UniformType::Vec4:
-                file << keyframe.value.v4[0] << "/" << keyframe.value.v4[1] << "/" << keyframe.value.v4[2] << "/" << keyframe.value.v4[3];
-                break;
-            }
-
-            file << "," << keyframe.interpolationToNumber() << "," << keyframe.interpolationFactor << ";";
-        }
-
-        file << "\n";
+        saveSingleUniformToFile(file, uniform);
     }
+
+    saveSingleUniformToFile(file, cameraController.positionUniform);
+    saveSingleUniformToFile(file, cameraController.rotationUniform);
 
     file.close();
 }
@@ -776,7 +784,13 @@ void loadUniformsFromFile(const std::string& filename)
         {
             Uniform nextUniform = loadUniformFromLine(lineStream);
             if (nextUniform.type == UniformType::Untyped) throw std::runtime_error("Failed to load uniform from line: " + line);
-            uniformList.push_back(nextUniform);
+
+            if (nextUniform.name == "_cp")
+                cameraController.positionUniform = nextUniform;
+            else if (nextUniform.name == "_cr")
+                cameraController.rotationUniform = nextUniform;
+            else
+                uniformList.push_back(nextUniform);
         }
         catch (const std::exception& e)
         {
