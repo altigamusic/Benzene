@@ -791,7 +791,7 @@ std::vector<int> getAllKeyframes()
 {
     std::vector<int> keyframes;
 
-    for (const Uniform& uniform : uniformList)
+    auto appendKeyframes = [&keyframes](const Uniform& uniform)
     {
         for (const UniformKeyframe& keyframe : uniform.keyframes)
         {
@@ -801,7 +801,15 @@ std::vector<int> getAllKeyframes()
                 keyframes.push_back(time);
             }
         }
+    };
+
+    for (const Uniform& uniform : uniformList)
+    {
+        appendKeyframes(uniform);
     }
+
+    appendKeyframes(cameraController.positionUniform);
+    appendKeyframes(cameraController.targetUniform);
 
     std::sort(keyframes.begin(), keyframes.end());
 
