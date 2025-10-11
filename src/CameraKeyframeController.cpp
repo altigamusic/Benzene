@@ -55,7 +55,7 @@ void CameraKeyframeController::updateCamera(long timeDeltaMs)
 
     cameraController.updateCamera(timeDeltaMs);
 
-    if (isLocked)
+    if (isLocked && cameraController.didCameraMove())
     {
         positionKeyframe->value = getPositionValue();
         if (rotationKeyframe != nullptr) rotationKeyframe->value = getRotationValue();
@@ -73,8 +73,8 @@ void CameraKeyframeController::recalculateCameraTarget() { cameraController.reca
 void CameraKeyframeController::handleKeyDown(WPARAM wParam) { cameraController.handleKeyDown(wParam); }
 void CameraKeyframeController::handleKeyUp(WPARAM wParam) { cameraController.handleKeyUp(wParam); }
 void CameraKeyframeController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    cameraController.handleMouseMovement(hwndMain, uMsg, wParam, lParam);
+    {
+        cameraController.handleMouseMovement(hwndMain, uMsg, wParam, lParam);
 }
 
 vec3 CameraKeyframeController::getPosition() { return cameraController.position; }
