@@ -60,13 +60,13 @@ class CameraController
 {
   private:
     bool _didCameraMove = false;
-    float xAngle = 0;
-    float yAngle = 0;
 
   public:
     vec3 position = {};
     vec3 target = {};
 
+    float xAngle = 0;
+    float yAngle = 0;
     float movementX = 0, movementY = 0, movementZ = 0, movementToTarget = 0;
     float movementScale = 10;
     bool isCtrlDown = false;

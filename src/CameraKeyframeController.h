@@ -12,7 +12,7 @@ class CameraKeyframeController
 
     void displayKeyframeMarker();
     UniformValue getPositionValue();
-    UniformValue getTargetValue();
+    UniformValue getRotationValue();
 
   public:
     CameraKeyframeController();
@@ -30,5 +30,5 @@ class CameraKeyframeController
     vec3 getTarget();
 
     Uniform positionUniform;
-    Uniform targetUniform;
+    Uniform rotationUniform;
 };

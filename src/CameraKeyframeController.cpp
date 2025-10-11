@@ -3,7 +3,9 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_benzene_widgets.h"
 
-CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", UniformType::Vec3), targetUniform("_ct", UniformType::Vec3) {}
+CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", UniformType::Vec3), rotationUniform("_cr", UniformType::Vec2)
+{
+}
 
 void CameraKeyframeController::startFrame(long currentTime)
 {
@@ -11,7 +13,7 @@ void CameraKeyframeController::startFrame(long currentTime)
     this->currentTime = currentTime;
 
     UniformValue position = positionUniform.valueAtTime(currentTime);
-    UniformValue target = targetUniform.valueAtTime(currentTime);
+    UniformValue rotation = rotationUniform.valueAtTime(currentTime);
 
     bool isOnKeyframe = positionUniform.hasKeyframeAtTime(currentTime);
 
@@ -19,14 +21,15 @@ void CameraKeyframeController::startFrame(long currentTime)
     {
         // Apply the animation values to the camera controller
         cameraController.position = {position.v3[0], position.v3[1], position.v3[2]};
-        cameraController.target = {target.v3[0], target.v3[1], target.v3[2]};
-        cameraController.recalculateAnglesFromTarget();
+        cameraController.xAngle = rotation.v2[0];
+        cameraController.yAngle = rotation.v2[1];
+        cameraController.recalculateCameraTarget();
     }
 }
 
 UniformValue CameraKeyframeController::getPositionValue()
 {
-    UniformValue positionValue;
+    UniformValue positionValue{};
     positionValue.v3[0] = cameraController.position.x;
     positionValue.v3[1] = cameraController.position.y;
     positionValue.v3[2] = cameraController.position.z;
@@ -34,20 +37,19 @@ UniformValue CameraKeyframeController::getPositionValue()
     return positionValue;
 }
 
-UniformValue CameraKeyframeController::getTargetValue()
+UniformValue CameraKeyframeController::getRotationValue()
 {
-    UniformValue targetValue;
-    targetValue.v3[0] = cameraController.target.x;
-    targetValue.v3[1] = cameraController.target.y;
-    targetValue.v3[2] = cameraController.target.z;
+    UniformValue rotationValue{};
+    rotationValue.v2[0] = cameraController.xAngle;
+    rotationValue.v2[1] = cameraController.yAngle;
 
-    return targetValue;
+    return rotationValue;
 }
 
 void CameraKeyframeController::updateCamera(long timeDeltaMs)
 {
     auto positionKeyframe = positionUniform.getKeyframeAtTime(currentTime);
-    auto targetKeyframe = targetUniform.getKeyframeAtTime(currentTime);
+    auto rotationKeyframe = rotationUniform.getKeyframeAtTime(currentTime);
 
     if (isLocked && positionKeyframe == nullptr) return;
 
@@ -56,7 +58,7 @@ void CameraKeyframeController::updateCamera(long timeDeltaMs)
     if (isLocked)
     {
         positionKeyframe->value = getPositionValue();
-        if (targetKeyframe != nullptr) targetKeyframe->value = getTargetValue();
+        if (rotationKeyframe != nullptr) rotationKeyframe->value = getRotationValue();
     }
 }
 
@@ -91,13 +93,13 @@ void CameraKeyframeController::displayKeyframeMarker()
         {
             // Keyframe was deleted
             positionUniform.removeKeyframeAtTime(currentTime);
-            targetUniform.removeKeyframeAtTime(currentTime);
+            rotationUniform.removeKeyframeAtTime(currentTime);
         }
         else
         {
             // Keyframe was added
             positionUniform.setKeyframeAtTime(currentTime, getPositionValue(), interpolation, tension);
-            targetUniform.setKeyframeAtTime(currentTime, getTargetValue(), interpolation, tension);
+            rotationUniform.setKeyframeAtTime(currentTime, getRotationValue(), interpolation, tension);
         }
     }
 }

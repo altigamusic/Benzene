@@ -809,7 +809,7 @@ std::vector<int> getAllKeyframes()
     }
 
     appendKeyframes(cameraController.positionUniform);
-    appendKeyframes(cameraController.targetUniform);
+    appendKeyframes(cameraController.rotationUniform);
 
     std::sort(keyframes.begin(), keyframes.end());
 
@@ -841,7 +841,7 @@ bool renderTimelines(int* time, int maxTime)
                 int newTime = std::clamp(kfMovement.newTime, minValue, maxValue);
 
                 cameraController.positionUniform.keyframes[kfMovement.index].time = newTime;
-                cameraController.targetUniform.keyframes[kfMovement.index].time = newTime;
+                cameraController.rotationUniform.keyframes[kfMovement.index].time = newTime;
             }
 
             didChange = true;
