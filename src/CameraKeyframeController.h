@@ -13,6 +13,7 @@ class CameraKeyframeController
     void displayKeyframeMarker();
     UniformValue getPositionValue();
     UniformValue getRotationValue();
+    void moveCameraToKeyframe();
 
   public:
     CameraKeyframeController();
@@ -20,11 +21,12 @@ class CameraKeyframeController
     void displayImGuiWindow();
     void updateCamera(long timeDelta);
 
-    bool didCameraMove() const;
     void recalculateCameraTarget();
     void handleKeyDown(WPARAM wParam);
     void handleKeyUp(WPARAM wParam);
     void handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    void forceMovement();
+    bool didCameraMove() const;
 
     vec3 getPosition();
     vec3 getTarget();

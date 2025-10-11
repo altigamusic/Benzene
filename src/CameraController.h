@@ -86,6 +86,8 @@ class CameraController
     void resetCamera();
 
     void handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    void handleKeyDown(WPARAM wParam);
+    void handleKeyUp(WPARAM wParam);
 
     void moveForward(float amount);
 
@@ -97,11 +99,7 @@ class CameraController
 
     void updateCamera(long timeDeltaMs);
 
-    void handleKeyDown(WPARAM wParam);
-
-    void handleKeyUp(WPARAM wParam);
-
     void resetCameraMovementCheck();
-
+    void markAsMoved();
     bool didCameraMove() const;
 };

@@ -786,11 +786,19 @@ void loadUniformsFromFile(const std::string& filename)
             if (nextUniform.type == UniformType::Untyped) throw std::runtime_error("Failed to load uniform from line: " + line);
 
             if (nextUniform.name == "_cp")
+            {
                 cameraController.positionUniform = nextUniform;
+                cameraController.forceMovement();
+            }
             else if (nextUniform.name == "_cr")
+            {
                 cameraController.rotationUniform = nextUniform;
+                cameraController.forceMovement();
+            }
             else
+            {
                 uniformList.push_back(nextUniform);
+            }
         }
         catch (const std::exception& e)
         {

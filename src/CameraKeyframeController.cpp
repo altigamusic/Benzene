@@ -7,6 +7,17 @@ CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", Un
 {
 }
 
+void CameraKeyframeController::moveCameraToKeyframe()
+{
+    UniformValue position = positionUniform.valueAtTime(currentTime);
+    UniformValue rotation = rotationUniform.valueAtTime(currentTime);
+    cameraController.position = {position.v3[0], position.v3[1], position.v3[2]};
+    cameraController.xAngle = rotation.v2[0];
+    cameraController.yAngle = rotation.v2[1];
+    cameraController.recalculateCameraTarget();
+    cameraController.markAsMoved();
+}
+
 void CameraKeyframeController::startFrame(long currentTime)
 {
     bool didTimeChange = this->currentTime != currentTime;
@@ -14,17 +25,7 @@ void CameraKeyframeController::startFrame(long currentTime)
     cameraController.resetCameraMovementCheck();
     this->currentTime = currentTime;
 
-    UniformValue position = positionUniform.valueAtTime(currentTime);
-    UniformValue rotation = rotationUniform.valueAtTime(currentTime);
-
-    if (isLocked && didTimeChange)
-    {
-        // Apply the animation values to the camera controller
-        cameraController.position = {position.v3[0], position.v3[1], position.v3[2]};
-        cameraController.xAngle = rotation.v2[0];
-        cameraController.yAngle = rotation.v2[1];
-        cameraController.recalculateCameraTarget();
-    }
+    if (isLocked && didTimeChange) moveCameraToKeyframe();
 }
 
 UniformValue CameraKeyframeController::getPositionValue()
@@ -62,12 +63,18 @@ void CameraKeyframeController::updateCamera(long timeDeltaMs)
     }
 }
 
+void CameraKeyframeController::forceMovement()
+{
+    if (isLocked) moveCameraToKeyframe();
+}
+
 bool CameraKeyframeController::didCameraMove() const
 {
     bool isOnKeyframe = positionUniform.hasKeyframeAtTime(currentTime);
     bool isPositionForced = isLocked && !isOnKeyframe;
     return isPositionForced || cameraController.didCameraMove();
 }
+
 void CameraKeyframeController::recalculateCameraTarget() { cameraController.recalculateCameraTarget(); }
 
 void CameraKeyframeController::handleKeyDown(WPARAM wParam) { cameraController.handleKeyDown(wParam); }
@@ -114,7 +121,10 @@ void CameraKeyframeController::displayImGuiWindow()
     ImGui::SeparatorText("Camera");
     ImGui::BeginChild("Camera");
 
-    ImGui::Selectable("Locked", &isLocked);
+    if (ImGui::Selectable("Locked", &isLocked) && isLocked)
+        // If the user locked the camera, reset its position
+        moveCameraToKeyframe();
+
     displayKeyframeMarker();
 
     ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", cameraController.position.x, cameraController.position.y, cameraController.position.z);

@@ -210,6 +210,8 @@ void CameraController::handleKeyUp(WPARAM wParam)
 
 void CameraController::resetCameraMovementCheck() { _didCameraMove = false; }
 
+void CameraController::markAsMoved() { _didCameraMove = true; }
+
 bool CameraController::didCameraMove() const
 {
     return _didCameraMove || movementX != 0 || movementY != 0 || movementZ != 0 || movementToTarget != 0;
