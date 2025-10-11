@@ -9,15 +9,15 @@ CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", Un
 
 void CameraKeyframeController::startFrame(long currentTime)
 {
+    bool didTimeChange = this->currentTime != currentTime;
+
     cameraController.resetCameraMovementCheck();
     this->currentTime = currentTime;
 
     UniformValue position = positionUniform.valueAtTime(currentTime);
     UniformValue rotation = rotationUniform.valueAtTime(currentTime);
 
-    bool isOnKeyframe = positionUniform.hasKeyframeAtTime(currentTime);
-
-    if (isLocked && !isOnKeyframe)
+    if (isLocked && didTimeChange)
     {
         // Apply the animation values to the camera controller
         cameraController.position = {position.v3[0], position.v3[1], position.v3[2]};
