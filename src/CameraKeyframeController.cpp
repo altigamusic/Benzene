@@ -129,7 +129,7 @@ void CameraKeyframeController::displayImGuiWindow()
     displayKeyframeMarker();
 
     ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", cameraController.position.x, cameraController.position.y, cameraController.position.z);
-    ImGui::Text("Camera Target: %.2f, %.2f, %.2f", cameraController.target.x, cameraController.target.y, cameraController.target.z);
+    ImGui::Text("Camera Rotation: %.2f, %.2f", cameraController.xAngle, cameraController.yAngle);
     ImGui::Text("Camera Direction: %.2f, %.2f, %.2f", cameraController.target.x - cameraController.position.x,
         cameraController.target.y - cameraController.position.y, cameraController.target.z - cameraController.position.z);
 
