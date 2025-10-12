@@ -19,6 +19,7 @@
 #include "uniform.h"
 #include <regex>
 #include "imgui/imgui_benzene_widgets.h"
+#include "config.h"
 
 int sidebarWidth;
 int sidebarHeight;
@@ -29,7 +30,7 @@ int viewportHeight = 600;
 int timelineWidth;
 int timelineHeight = 200;
 CameraKeyframeController cameraController;
-const char* uniformFileName = "uniforms.txt";
+const char* configFileName = "config.json";
 
 bool showDemoWindow;
 
@@ -128,90 +129,6 @@ std::string generateUniformCode()
         }
     }
     return uniformStream.str();
-}
-
-void saveSingleUniformToFile(std::ofstream& file, const Uniform& uniform)
-{
-    file << uniform.name;
-
-    switch (uniform.type)
-    {
-    case UniformType::Float:
-        file << ";float;";
-        break;
-    case UniformType::Int:
-        file << ";int;";
-        break;
-    case UniformType::Bool:
-        file << ";bool;";
-        break;
-    case UniformType::Vec2:
-        file << ";vec2;";
-        break;
-    case UniformType::Vec3:
-        file << ";vec3;";
-        break;
-    case UniformType::Color:
-        file << ";color;";
-        break;
-    case UniformType::Vec4:
-        file << ";vec4;";
-        break;
-    }
-
-    for (auto& keyframe : uniform.keyframes)
-    {
-        file << (int)keyframe.time << ",";
-
-        switch (uniform.type)
-        {
-        case UniformType::Float:
-            file << std::fixed << std::setprecision(6) << keyframe.value.f;
-            break;
-        case UniformType::Int:
-            file << keyframe.value.i;
-            break;
-        case UniformType::Bool:
-            file << (keyframe.value.b ? "true" : "false");
-            break;
-        case UniformType::Vec2:
-            file << std::fixed << std::setprecision(6) << keyframe.value.v2[0] << "/" << keyframe.value.v2[1];
-            break;
-        case UniformType::Vec3:
-            file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
-            break;
-        case UniformType::Color:
-            file << keyframe.value.v3[0] << "/" << keyframe.value.v3[1] << "/" << keyframe.value.v3[2];
-            break;
-        case UniformType::Vec4:
-            file << keyframe.value.v4[0] << "/" << keyframe.value.v4[1] << "/" << keyframe.value.v4[2] << "/" << keyframe.value.v4[3];
-            break;
-        }
-
-        file << "," << keyframe.interpolationToNumber() << "," << keyframe.interpolationFactor << ";";
-    }
-
-    file << "\n";
-}
-
-void saveUniformsToFile(const std::string& filename)
-{
-    std::ofstream file(filename);
-    if (!file.is_open())
-    {
-        openDebugWindow("Failed to open file for saving uniforms: " + filename);
-        return;
-    }
-
-    for (const Uniform& uniform : uniformList)
-    {
-        saveSingleUniformToFile(file, uniform);
-    }
-
-    saveSingleUniformToFile(file, cameraController.positionUniform);
-    saveSingleUniformToFile(file, cameraController.rotationUniform);
-
-    file.close();
 }
 
 void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting = false)
@@ -663,154 +580,30 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
     return didAnythingChange;
 }
 
-UniformType getUniformTypeFromString(const std::string& typeString)
+void loadConfigFromFile(const std::string& filename)
 {
-    if (typeString == "float")
-        return UniformType::Float;
-    else if (typeString == "int")
-        return UniformType::Int;
-    else if (typeString == "bool")
-        return UniformType::Bool;
-    else if (typeString == "vec2")
-        return UniformType::Vec2;
-    else if (typeString == "vec3")
-        return UniformType::Vec3;
-    else if (typeString == "color")
-        return UniformType::Color;
-    else if (typeString == "vec4")
-        return UniformType::Vec4;
-    else
-        return UniformType::Untyped;
+    try
+    {
+        UniformConfig cfg = loadConfig(filename);
+        uniformList = std::move(cfg.uniformList);
+    }
+    catch (const std::exception& e)
+    {
+        openDebugWindow(e.what());
+    }
 }
 
-UniformValue getUniformValueFromString(const UniformType type, const std::string& valueStr)
+void saveConfigToFile(const std::string& filename)
 {
-    UniformValue value{};
-    bool loadError = false;
-
-    switch (type)
+    try
     {
-    case UniformType::Float:
-        value.f = std::stof(valueStr);
-        break;
-    case UniformType::Int:
-        value.i = std::stoi(valueStr);
-        break;
-    case UniformType::Bool:
-        value.b = (valueStr == "true");
-        loadError = valueStr != "false" && valueStr != "true";
-        break;
-    case UniformType::Vec2:
-        loadError = sscanf(valueStr.c_str(), "%f/%f", &value.v2[0], &value.v2[1]) != 2;
-        break;
-    case UniformType::Vec3:
-        loadError = sscanf(valueStr.c_str(), "%f/%f/%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
-        break;
-    case UniformType::Color:
-        loadError = sscanf(valueStr.c_str(), "%f/%f/%f", &value.v3[0], &value.v3[1], &value.v3[2]) != 3;
-        break;
-    case UniformType::Vec4:
-        loadError = sscanf(valueStr.c_str(), "%f/%f/%f/%f", &value.v4[0], &value.v4[1], &value.v4[2], &value.v4[3]) != 4;
-        break;
-    default:
-        loadError = true;
-        break;
+        UniformConfig config{uniformList};
+        saveConfig(config, filename);
     }
-
-    if (loadError)
+    catch (const std::exception& e)
     {
-        throw std::runtime_error("Failed to parse uniform value from string: " + valueStr);
+        openDebugWindow(e.what());
     }
-
-    return value;
-}
-
-Uniform loadUniformFromLine(std::stringstream& line)
-{
-    std::string name, typeStr, valueStr = "";
-    bool loadError = false;
-
-    if (!std::getline(line, name, ';') || !std::getline(line, typeStr, ';'))
-        throw new std::runtime_error("Failed to read uniform from file");
-
-    std::getline(line, valueStr);
-
-    Uniform uniform(name);
-    uniform.type = getUniformTypeFromString(typeStr);
-
-    std::stringstream keyframeStream(valueStr);
-    std::string keyframeStr;
-
-    while (std::getline(keyframeStream, keyframeStr, ';'))
-    {
-        if (keyframeStr.empty()) continue;
-
-        std::stringstream keyframeStream(keyframeStr);
-        std::string timeStr, valueStr, interpolationTypeStr, interpolationFactorStr;
-
-        if (!std::getline(keyframeStream, timeStr, ',')) throw new std::runtime_error("Invalid keyframe time");
-        if (!std::getline(keyframeStream, valueStr, ',')) throw new std::runtime_error("Invalid keyframe value");
-        if (!std::getline(keyframeStream, interpolationTypeStr, ',')) throw new std::runtime_error("Invalid keyframe interpolation type");
-        if (!std::getline(keyframeStream, interpolationFactorStr, ','))
-            throw new std::runtime_error("Invalid keyframe interpolation factor");
-
-        float time = std::stof(timeStr);
-        UniformValue value = getUniformValueFromString(uniform.type, valueStr);
-        KeyframeInterpolation interpolation = static_cast<KeyframeInterpolation>(std::stoi(interpolationTypeStr));
-        float interpolationFactor = std::stof(interpolationFactorStr);
-
-        uniform.setKeyframeAtTime(time, value, interpolation, interpolationFactor);
-    }
-
-    return uniform;
-}
-
-void loadUniformsFromFile(const std::string& filename)
-{
-    uniformList.clear();
-
-    std::ifstream file(filename);
-    if (!file.is_open())
-    {
-        // The uniform file is optional
-        return;
-    }
-
-    std::string line;
-
-    while (std::getline(file, line))
-    {
-        std::stringstream lineStream(line);
-        std::string name, type, valueStr;
-        bool loadError = false;
-
-        try
-        {
-            Uniform nextUniform = loadUniformFromLine(lineStream);
-            if (nextUniform.type == UniformType::Untyped) throw std::runtime_error("Failed to load uniform from line: " + line);
-
-            if (nextUniform.name == "_cp")
-            {
-                cameraController.positionUniform = nextUniform;
-                cameraController.forceMovement();
-            }
-            else if (nextUniform.name == "_cr")
-            {
-                cameraController.rotationUniform = nextUniform;
-                cameraController.forceMovement();
-            }
-            else
-            {
-                uniformList.push_back(nextUniform);
-            }
-        }
-        catch (const std::exception& e)
-        {
-            openDebugWindow(e.what());
-        }
-    }
-
-    file.close();
 }
 
 std::vector<int> getAllKeyframes()
@@ -985,13 +778,13 @@ bool renderMenuBar()
         {
             if (ImGui::MenuItem("Reload Uniforms From File"))
             {
-                loadUniformsFromFile(uniformFileName);
+                loadConfigFromFile(configFileName);
                 loadFragmentShader(currentShader.c_str());
                 didChange = true;
             }
             if (ImGui::MenuItem("Save Uniforms"))
             {
-                saveUniformsToFile(uniformFileName);
+                saveConfigToFile(configFileName);
             }
 
             ImGui::EndMenu();
@@ -1028,7 +821,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     }
 
     cameraController.recalculateCameraTarget();
-    loadUniformsFromFile(uniformFileName);
+    loadConfigFromFile(configFileName);
 
     long prevTime = timeGetTime();
     int t = 0;
@@ -1166,7 +959,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
-    saveUniformsToFile(uniformFileName);
+    saveConfigToFile(configFileName);
 
     sndPlaySound(0, 0);
     window_end(info);

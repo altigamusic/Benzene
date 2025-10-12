@@ -20,6 +20,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="src\CameraKeyframeController.cpp" />
+    <ClCompile Include="src\config.cpp" />
     <ClCompile Include="src\ext.cpp" />
     <ClCompile Include="src\generated\release.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Editor|Win32'">true</ExcludedFromBuild>
@@ -76,6 +77,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="src\CameraKeyframeController.h" />
+    <ClInclude Include="src\config.h" />
     <ClInclude Include="src\ext.h" />
     <ClInclude Include="src\glext.h" />
     <ClInclude Include="src\imgui\imconfig.h">
@@ -121,7 +123,10 @@
     <ClInclude Include="src\intro.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="src\nlohmann\json.hpp" />
+    <ClInclude Include="src\nlohmann\json.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="src\release.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Editor|Win32'">true</ExcludedFromBuild>
     </ClInclude>

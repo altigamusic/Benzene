@@ -1,0 +1,196 @@
+#include "config.h"
+#include <sstream>
+#include <fstream>
+#include "nlohmann/json.hpp"
+
+using json = nlohmann::json;
+
+static UniformType getUniformTypeFromString(const std::string& typeString)
+{
+    if (typeString == "float")
+        return UniformType::Float;
+    else if (typeString == "int")
+        return UniformType::Int;
+    else if (typeString == "bool")
+        return UniformType::Bool;
+    else if (typeString == "vec2")
+        return UniformType::Vec2;
+    else if (typeString == "vec3")
+        return UniformType::Vec3;
+    else if (typeString == "color")
+        return UniformType::Color;
+    else if (typeString == "vec4")
+        return UniformType::Vec4;
+    else
+        return UniformType::Untyped;
+}
+
+static std::string uniformTypeToString(const UniformType type)
+{
+    switch (type)
+    {
+    case UniformType::Float:
+        return "float";
+    case UniformType::Int:
+        return "int";
+    case UniformType::Bool:
+        return "bool";
+    case UniformType::Vec2:
+        return "vec2";
+    case UniformType::Vec3:
+        return "vec3";
+    case UniformType::Color:
+        return "color";
+    case UniformType::Vec4:
+        return "vec4";
+    }
+
+    return "unknown";
+}
+
+static UniformValue getUniformValueFromJson(const UniformType type, const json& valueJson)
+{
+    UniformValue value{};
+    bool success = true;
+
+    switch (type)
+    {
+    case UniformType::Float:
+        value.f = valueJson;
+        success = valueJson.is_number();
+        break;
+    case UniformType::Int:
+        value.i = valueJson;
+        success = valueJson.is_number_integer();
+        break;
+    case UniformType::Bool:
+        value.b = valueJson;
+        success = valueJson.is_boolean();
+        break;
+    case UniformType::Vec2:
+        success = valueJson.is_array() && valueJson.size() == 2;
+        value.v2[0] = valueJson[0];
+        value.v2[1] = valueJson[1];
+        break;
+    case UniformType::Vec3:
+    case UniformType::Color:
+        success = valueJson.is_array() && valueJson.size() == 3;
+        value.v3[0] = valueJson[0];
+        value.v3[1] = valueJson[1];
+        value.v3[2] = valueJson[2];
+        break;
+    case UniformType::Vec4:
+        success = valueJson.is_array() && valueJson.size() == 4;
+        value.v4[0] = valueJson[0];
+        value.v4[1] = valueJson[1];
+        value.v4[2] = valueJson[2];
+        value.v4[3] = valueJson[3];
+        break;
+    default:
+        success = false;
+        break;
+    }
+
+    if (!success)
+    {
+        throw std::runtime_error("Failed to parse uniform JSON: " + valueJson.dump());
+    }
+
+    return value;
+}
+
+static json uniformValueToJson(const UniformType type, const UniformValue value)
+{
+    switch (type)
+    {
+    case UniformType::Float:
+        return value.f;
+    case UniformType::Int:
+        return value.i;
+    case UniformType::Bool:
+        return value.b;
+    case UniformType::Vec2:
+        return json::array({value.v2[0], value.v2[1]});
+    case UniformType::Vec3:
+    case UniformType::Color:
+        return json::array({value.v3[0], value.v3[1], value.v3[2]});
+    case UniformType::Vec4:
+        return json::array({value.v4[0], value.v4[1], value.v4[2], value.v4[3]});
+    }
+
+    return nullptr;
+}
+
+UniformConfig loadConfig(const std::string& filename)
+{
+    UniformConfig config;
+
+    std::ifstream configFile(filename);
+
+    json configJson = json::parse(configFile);
+
+    for (auto& uniformJson : configJson["uniforms"])
+    {
+        Uniform newUniform(uniformJson["name"], getUniformTypeFromString(uniformJson["type"]));
+
+        for (auto& keyframeJson : uniformJson["keyframes"])
+        {
+            int time = keyframeJson["time"];
+            UniformValue value = getUniformValueFromJson(newUniform.type, keyframeJson["value"]);
+
+            KeyframeInterpolation interpolation = static_cast<KeyframeInterpolation>((int)keyframeJson["interpolation"]);
+            float tension = keyframeJson["tension"];
+
+            newUniform.setKeyframeAtTime(time, value, interpolation, tension);
+        }
+
+        config.uniformList.push_back(newUniform);
+    }
+
+    return config;
+}
+
+bool saveConfig(const UniformConfig& config, const std::string& filename)
+{
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        //throw std::runtime_error("Failed to open file for saving uniforms: " + filename);
+        return false;
+    }
+
+    json uniformListJson = json::array();
+
+    for (auto& uniform : config.uniformList)
+    {
+        json keyframesJson = json::array();
+
+        for (auto& keyframe : uniform.keyframes)
+        {
+            keyframesJson.push_back({
+                {"time", keyframe.time},
+                {"value", uniformValueToJson(uniform.type, keyframe.value)},
+                {"interpolation", static_cast<int>(keyframe.interpolation)},
+                {"tension", keyframe.interpolationFactor}
+            });
+        }
+
+        json uniformJson = {
+            {"name",      uniform.name                     },
+            {"type",      uniformTypeToString(uniform.type)},
+            {"keyframes", keyframesJson                    }
+        };
+
+        uniformListJson.push_back(uniformJson);
+    }
+
+    json configJson = {
+        {"uniforms", uniformListJson}
+    };
+
+    file << configJson;
+
+    file.close();
+
+    return true;
+}

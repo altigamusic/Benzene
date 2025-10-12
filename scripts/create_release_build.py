@@ -1,7 +1,7 @@
 import os
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
+import json
 
 
 @dataclass
@@ -55,37 +55,21 @@ def getCorrectedTension(tension, interpolation):
     return a
 
 
-def parse_keyframe(keyframe_string):
-    if keyframe_string == "":
-        return None
+def parse_keyframe(kf: dict):
+    interpolation = int(kf["interpolation"])
+    value = kf["value"] if isinstance(kf["value"], list) else [kf["value"]]
 
-    parts = keyframe_string.split(",")
-    if len(parts) != 4:
-        raise ValueError(f"Invalid keyframe string: {keyframe_string}")
-
-    time, value, interpolation, tension = parts
-    time = int(time)
-    interpolation = int(interpolation)
-    tension = round(getCorrectedTension(float(tension), interpolation))
-    values = [float(v) for v in value.split("/")]
-
-    return Keyframe(time, values, interpolation, tension)
+    return Keyframe(int(kf["time"]), value, interpolation, getCorrectedTension(kf["tension"], interpolation))
 
 
-def parse_uniforms_file(filename):
-    uniforms = []
-
+def parse_config_file(filename):
     with open(filename, "r") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split(";")
-            if len(parts) < 2:
-                continue
+        config = json.load(f)
 
-            keyframes = list(filter(bool, map(parse_keyframe, parts[2:])))
-            uniforms.append(Uniform(name=parts[0], type=parts[1], keyframes=keyframes))
+    uniforms = [
+        Uniform(uniform["name"], uniform["type"], [parse_keyframe(kf) for kf in uniform["keyframes"]])
+        for uniform in config["uniforms"]
+    ]
 
     return uniforms
 
@@ -107,7 +91,7 @@ def number_of_params(uniform: Uniform):
         raise ValueError(f"Unsupported uniform type: {uniform.type}")
 
 
-def gen_keyframe_arrays(uniforms):
+def gen_keyframe_arrays(uniforms: list[Uniform]):
     arrays = []
     index = 0
 
@@ -174,7 +158,8 @@ def generate_release_file_code(uniforms):
         if number_of_keyframes == 0:
             params = ["0.0f"] * number_of_params(uniform)
         else:
-            params = [f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
+            params = [
+                f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
         param_string = ",".join(params)
         kf_index += len(params)
 
@@ -243,12 +228,12 @@ vec2 fragCoord = gl_FragCoord.xy;
 
 def main():
     print(os.listdir("."))
-    uniforms_filename = "uniforms.txt"
+    config_filename = "config.json"
     output_filename = "src/generated/release.cpp"
     shader_source_filename = "shaders/FragmentShader.glsl"
     shader_output_filename = "src/generated/shader.inl"
 
-    uniforms = parse_uniforms_file(uniforms_filename)
+    uniforms = parse_config_file(config_filename)
 
     if SHOULD_INJECT_CONSTS:
         animated_uniforms, consts = split_animated_and_const_uniforms(uniforms)
