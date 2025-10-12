@@ -270,6 +270,20 @@ const KeyframeInterpolation POSSIBLE_INTERPOLATIONS[] = {
     KeyframeInterpolation::Linear, KeyframeInterpolation::Step, KeyframeInterpolation::Tonemap, KeyframeInterpolation::Gain};
 const char* INTERPOLATION_NAMES[] = {"Linear", "Step", "Tonemap", "Gain"};
 
+static void PlotTension(KeyframeInterpolation interpolation, float tension)
+{
+    constexpr size_t PLOT_RESOLUTION = 100;
+    float values[PLOT_RESOLUTION] = {0};
+
+    for (int i = 0; i < PLOT_RESOLUTION; i++)
+    {
+        float x = (float)i / PLOT_RESOLUTION;
+        values[i] = interpolate0to1(x, interpolation, tension);
+    }
+
+    ImGui::PlotLines("##TensionGraph", values, PLOT_RESOLUTION);
+}
+
 bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension)
 {
     const ImU32 KEYFRAME_OUTLINE_COLOR = GetColorU32(ImGuiCol_SliderGrabActive);
@@ -312,30 +326,29 @@ bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interp
     draw_list->AddConvexPolyFilled(rhombus_points, 4, color);
     draw_list->AddPolyline(rhombus_points, 4, KEYFRAME_OUTLINE_COLOR, ImDrawFlags_Closed, 1.);
 
-    if (*data)
+    if (*data && BeginPopupContextItem(label))
     {
-        if (BeginPopupContextItem(label))
+        for (int i = 0; i < NUM_POSSIBLE_INTERPOLATIONS; i++)
         {
-            for (int i = 0; i < NUM_POSSIBLE_INTERPOLATIONS; i++)
+            bool is_selected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
+
+            if (Selectable(INTERPOLATION_NAMES[i], is_selected))
             {
-                bool is_selected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
-
-                if (Selectable(INTERPOLATION_NAMES[i], is_selected))
-                {
-                    *interpolation = POSSIBLE_INTERPOLATIONS[i];
-                    pressed = true;
-                }
-
-                if (is_selected) SetItemDefaultFocus();
-            }
-
-            if (SliderFloat("Tension", tension, 0.0f, 1.0f, "%.2f"))
-            {
+                *interpolation = POSSIBLE_INTERPOLATIONS[i];
                 pressed = true;
             }
 
-            EndPopup();
+            if (is_selected) SetItemDefaultFocus();
         }
+
+        if (SliderFloat("Tension", tension, 0.0f, 1.0f, "%.2f"))
+        {
+            pressed = true;
+        }
+
+        PlotTension(*interpolation, *tension);
+
+        EndPopup();
     }
 
     return pressed;

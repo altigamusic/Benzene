@@ -29,3 +29,5 @@ enum class KeyframeInterpolation
     Tonemap,
     Gain
 };
+
+float interpolate0to1(float x, KeyframeInterpolation interpolation, float interpolationFactor);
