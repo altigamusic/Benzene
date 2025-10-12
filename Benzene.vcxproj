@@ -121,6 +121,7 @@
     <ClInclude Include="src\intro.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="src\nlohmann\json.hpp" />
     <ClInclude Include="src\release.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Editor|Win32'">true</ExcludedFromBuild>
     </ClInclude>
