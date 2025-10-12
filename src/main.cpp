@@ -586,6 +586,8 @@ void loadConfigFromFile(const std::string& filename)
     {
         UniformConfig cfg = loadConfig(filename);
         uniformList = std::move(cfg.uniformList);
+        if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
+        if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
     }
     catch (const std::exception& e)
     {
@@ -597,7 +599,7 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
-        UniformConfig config{uniformList};
+        UniformConfig config{uniformList, cameraController.positionUniform, cameraController.rotationUniform};
         saveConfig(config, filename);
     }
     catch (const std::exception& e)

@@ -144,10 +144,42 @@ UniformConfig loadConfig(const std::string& filename)
             newUniform.setKeyframeAtTime(time, value, interpolation, tension);
         }
 
-        config.uniformList.push_back(newUniform);
+        if (newUniform.name == "_cp")
+        {
+            config.cameraPosition = newUniform;
+        }
+        else if (newUniform.name == "_cr")
+        {
+            config.cameraRotation = newUniform;
+        }
+        else
+        {
+            config.uniformList.push_back(newUniform);
+        }
     }
 
     return config;
+}
+
+json uniformToJson(const Uniform& uniform)
+{
+    json keyframesJson = json::array();
+
+    for (auto& keyframe : uniform.keyframes)
+    {
+        keyframesJson.push_back({
+            {"time", keyframe.time},
+            {"value", uniformValueToJson(uniform.type, keyframe.value)},
+            {"interpolation", static_cast<int>(keyframe.interpolation)},
+            {"tension", keyframe.interpolationFactor}
+        });
+    }
+
+    return {
+        {"name",      uniform.name                     },
+        {"type",      uniformTypeToString(uniform.type)},
+        {"keyframes", keyframesJson                    }
+    };
 }
 
 bool saveConfig(const UniformConfig& config, const std::string& filename)
@@ -155,7 +187,7 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
     std::ofstream file(filename);
     if (!file.is_open())
     {
-        //throw std::runtime_error("Failed to open file for saving uniforms: " + filename);
+        // throw std::runtime_error("Failed to open file for saving uniforms: " + filename);
         return false;
     }
 
@@ -163,26 +195,11 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
 
     for (auto& uniform : config.uniformList)
     {
-        json keyframesJson = json::array();
-
-        for (auto& keyframe : uniform.keyframes)
-        {
-            keyframesJson.push_back({
-                {"time", keyframe.time},
-                {"value", uniformValueToJson(uniform.type, keyframe.value)},
-                {"interpolation", static_cast<int>(keyframe.interpolation)},
-                {"tension", keyframe.interpolationFactor}
-            });
-        }
-
-        json uniformJson = {
-            {"name",      uniform.name                     },
-            {"type",      uniformTypeToString(uniform.type)},
-            {"keyframes", keyframesJson                    }
-        };
-
-        uniformListJson.push_back(uniformJson);
+        uniformListJson.push_back(uniformToJson(uniform));
     }
+
+    if (config.cameraPosition.has_value()) uniformListJson.push_back(uniformToJson(config.cameraPosition.value()));
+    if (config.cameraRotation.has_value()) uniformListJson.push_back(uniformToJson(config.cameraRotation.value()));
 
     json configJson = {
         {"uniforms", uniformListJson}
