@@ -826,20 +826,25 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     cameraController.recalculateCameraTarget();
     loadConfigFromFile(configFileName);
 
-    long prevTime = timeGetTime();
+    long prevSystemTime = timeGetTime();
+    long playStartSystemTime = prevSystemTime;
+    long fpsStartSystemTime = prevSystemTime;
+    long lastRerenderSystemTime = -1;
+    long currentSystemTime = 0;
+
     int t = 0;
-    int fpsStart = prevTime;
-    int lastRerender = -1;
+    int playStartTime = 0;
     int frames = 0;
 
     bool prevShouldRerender = false;
 
     while (!done)
     {
-        long currentTime = timeGetTime();
-        long timeDelta = currentTime - prevTime;
-        if (isPlaying) t += timeDelta;
-        prevTime = currentTime;
+        currentSystemTime = timeGetTime();
+        if (playStartSystemTime > 0) t = playStartTime + currentSystemTime - playStartSystemTime;
+
+        long timeDeltaMs = currentSystemTime - prevSystemTime;
+        prevSystemTime = currentSystemTime;
 
         cameraController.startFrame(t);
 
@@ -857,7 +862,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
 
         // Move camera by keyboard input
-        cameraController.updateCamera(timeDelta);
+        cameraController.updateCamera(timeDeltaMs);
 
         bool shouldRerender = isPlaying;
 
@@ -916,19 +921,19 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
 
-        int fpsT = currentTime - fpsStart;
+        int fpsT = currentSystemTime - fpsStartSystemTime;
         ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetTextLineHeightWithSpacing() * 2);
         ImGui::Text("Frame delta: %.3f ms (%.1f FPS)\n", frames == 0 ? 0 : ((float)fpsT / frames), fpsT == 0 ? 0 : frames * 1000.f / fpsT);
 
         if (fpsT > 2000)
         {
-            fpsStart = currentTime;
+            fpsStartSystemTime = currentSystemTime;
             frames = 0;
         }
 
         ImGui::End();
 
-        if (currentTime - lastRerender > 2000)
+        if (currentSystemTime - lastRerenderSystemTime > 2000)
         {
             // Try reloading the file
             // TODO: Maybe change the way this is done or something
@@ -956,6 +961,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             frames++;
         }
 
+        // If isPlaying changed, propagate the change to the time variables
+        playStartSystemTime = isPlaying ? currentSystemTime : -1;
+        playStartTime = isPlaying ? t : -1;
+        
         prevShouldRerender = shouldRerender;
 
         ImGui::Render();
