@@ -357,7 +357,8 @@ bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interp
 bool PlayPauseButton(bool shouldDrawPauseIcon)
 {
     // Draw play/pause icons using ImGui's draw list
-    ImVec2 buttonSize(24, 24);
+    float height = ImGui::GetFrameHeight();
+    ImVec2 buttonSize(height, height);
     ImVec2 iconSize(10, 10);
     ImVec2 cursorPos = ImGui::GetCursorScreenPos();
 
