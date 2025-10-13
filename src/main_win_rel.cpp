@@ -12,6 +12,7 @@
 #include "ext.h"
 #include "release.h"
 #include "intro.h"
+#include "generated/release_config.h"
 
 static const PIXELFORMATDESCRIPTOR pfd = {sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
     PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 32, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0};
@@ -84,12 +85,12 @@ void entrypoint(void)
     initIntro(program);
 
     // play intro
-    long t = 0;
+    float t = 0;
     long frame = 0;
     long to = timeGetTime();
 
     do {
-        t = timeGetTime() - to;
+        t = (timeGetTime() - to) * BPM / 60000.0f;
         
         introLoop(t);
 
