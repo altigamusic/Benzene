@@ -71,7 +71,9 @@ def parse_config_file(filename):
         for uniform in config["uniforms"]
     ]
 
-    return uniforms
+    bpm = config["bpm"]
+
+    return uniforms, bpm
 
 
 def keyframe_to_array_string(keyframe: Keyframe, idx: int):
@@ -178,8 +180,8 @@ void locateUniforms(GLuint program) {{
 {uniform_locations}
 }}
 
-void updateUniforms(long time) {{
-    glUniform1f(timeUniformLocation, time / 1000.0f);
+void updateUniforms(float time) {{
+    glUniform1f(timeUniformLocation, time);
 {uniform_updates}
 }}
 """
@@ -190,6 +192,14 @@ def generate_release_file(uniforms, output_filename):
 
     with open(output_filename, "w") as f:
         f.write(release_file_code)
+
+
+def generate_release_header(output_filename, bpm):
+    with open(output_filename, "w") as f:
+        f.write(f"""#pragma once
+
+#define BPM {bpm:.2f}f
+""")
 
 
 def generate_minified_shader(shader_filename, uniforms: list[Uniform], consts: list[Const], output_filename, resolution=(800, 600)):
@@ -230,10 +240,11 @@ def main():
     print(os.listdir("."))
     config_filename = "config.json"
     output_filename = "src/generated/release.cpp"
+    output_header_filename = "src/generated/release_config.h"
     shader_source_filename = "shaders/FragmentShader.glsl"
     shader_output_filename = "src/generated/shader.inl"
 
-    uniforms = parse_config_file(config_filename)
+    uniforms, bpm = parse_config_file(config_filename)
 
     if SHOULD_INJECT_CONSTS:
         animated_uniforms, consts = split_animated_and_const_uniforms(uniforms)
@@ -242,6 +253,8 @@ def main():
 
     generate_release_file(animated_uniforms, output_filename)
     print(f"Generated {output_filename}")
+
+    generate_release_header(output_header_filename, bpm)
 
     generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename)
     print(f"Generated {shader_output_filename}")
