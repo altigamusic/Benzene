@@ -10,8 +10,6 @@ float box(vec3 p, vec3 r) {
 
 vec2 map(vec3 p) {
     vec2 h, t;
-    p.y -= boxY;
-    p.xz -= boxXZ;
     t = vec2(box(p, vec3(2)), 1);
     h = vec2(box(p, vec3(1, 2.5, 1)), 2);
     t = t.x < h.x ? t : h;
