@@ -20,7 +20,7 @@ extern int viewportHeight;
 #endif
 
 void initIntro(GLuint program);
-void introLoop(long time);
+void introLoop(float ftime);
 
 // Externally defined
-void updateUniforms(long timeInMs);
+void updateUniforms(float ftime);

@@ -18,7 +18,7 @@ void CameraKeyframeController::moveCameraToKeyframe()
     cameraController.markAsMoved();
 }
 
-void CameraKeyframeController::startFrame(long currentTime)
+void CameraKeyframeController::startFrame(float currentTime)
 {
     bool didTimeChange = this->currentTime != currentTime;
 

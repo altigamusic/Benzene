@@ -34,7 +34,7 @@ const char* configFileName = "config.json";
 
 bool showDemoWindow;
 
-int demoTimeLength = 140000;
+int demoTimeLength = 140;
 int bpm = 120;
 
 void resizeWindow(int width, int height)
@@ -226,10 +226,8 @@ bool reloadFragmentShaderFromFile()
     return didChange;
 }
 
-void updateUniforms(long timeInMs)
+void updateUniforms(const float ftime)
 {
-    const float ftime = 0.001f * (float)timeInMs;
-
     glUniform1f(timeLocation, ftime);
     glUniform2f(resolutionLocation, viewportWidth, viewportHeight);
     glUniform2f(windowOffsetLocation, sidebarWidth, timelineHeight);
@@ -244,7 +242,7 @@ void updateUniforms(long timeInMs)
 
     for (Uniform& uniform : uniformList)
     {
-        auto value = uniform.valueAtTime(timeInMs);
+        auto value = uniform.valueAtTime(ftime);
 
         switch (uniform.type)
         {
@@ -638,7 +636,7 @@ std::vector<int> getAllKeyframes()
     return keyframes;
 }
 
-bool renderTimelines(int* time, int maxTime)
+bool renderTimelines(float* time, float maxTime)
 {
     bool didChange = false;
 
@@ -648,19 +646,20 @@ bool renderTimelines(int* time, int maxTime)
     {
         // Camera slider is special because it's controlled differently
         // Camera position and camera target have the same keyframes
-        std::vector<int> keyframes;
+        std::vector<float> keyframes;
 
         for (const UniformKeyframe& keyframe : cameraController.positionUniform.keyframes)
-            keyframes.push_back(static_cast<int>(keyframe.time));
+            keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
         if (KeyframeSlider("Camera", time, 0, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
             {
-                int minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
-                int maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
-                int newTime = std::clamp(kfMovement.newTime, minValue, maxValue);
+                float minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
+                float maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
+                // Round to snap keyframes
+                float newTime = std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
 
                 cameraController.positionUniform.keyframes[kfMovement.index].time = newTime;
                 cameraController.rotationUniform.keyframes[kfMovement.index].time = newTime;
@@ -675,10 +674,10 @@ bool renderTimelines(int* time, int maxTime)
         // Display timelines only for animated uniforms, i.e. uniforms with 2+ keyframes
         if (uniform.keyframes.size() <= 1) continue;
 
-        std::vector<int> keyframes;
+        std::vector<float> keyframes;
 
         for (const UniformKeyframe& keyframe : uniform.keyframes)
-            keyframes.push_back(static_cast<int>(keyframe.time));
+            keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
 
@@ -687,10 +686,11 @@ bool renderTimelines(int* time, int maxTime)
             if (kfMovement.index >= 0)
             {
                 // Move the keyframe - prevent overlapping by restricting the bounds
-                int minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
-                int maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
+                float minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
+                float maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
 
-                uniform.keyframes[kfMovement.index].time = std::clamp(kfMovement.newTime, minValue, maxValue);
+                // Round to snap keyframes
+                uniform.keyframes[kfMovement.index].time = std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
             }
 
             didChange = true;
@@ -722,7 +722,7 @@ int findNextKeyframe(int t, const std::vector<int>& keyframes)
     return -1; // No next keyframe
 }
 
-bool handleKeyScrubbing(int& t, int maxTimelineTime, bool backButton, bool forwardButton)
+bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool forwardButton)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureKeyboard && !backButton && !forwardButton) return false;
@@ -744,7 +744,7 @@ bool handleKeyScrubbing(int& t, int maxTimelineTime, bool backButton, bool forwa
         }
         else
         {
-            t = max(0, t - 100);
+            t = max(0, std::ceil(t) - 1);
             return true;
         }
     }
@@ -763,7 +763,7 @@ bool handleKeyScrubbing(int& t, int maxTimelineTime, bool backButton, bool forwa
         }
         else
         {
-            t = min(maxTimelineTime, t + 100);
+            t = min(maxTimelineTime, std::floor(t) + 1);
             return true;
         }
     }
@@ -797,6 +797,9 @@ bool renderMenuBar()
 
     return didChange;
 }
+
+float msToBeats(long ms, float bpm) { return ms * bpm / 60000; }
+long beatsToMs(float beats, float bpm) { return 60000 / bpm * beats; }
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
@@ -832,8 +835,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     long lastRerenderSystemTime = -1;
     long currentSystemTime = 0;
 
-    int t = 0;
-    int playStartTime = 0;
+    float t = 0;
+    float playStartTime = 0;
     int frames = 0;
 
     bool prevShouldRerender = false;
@@ -841,10 +844,16 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     while (!done)
     {
         currentSystemTime = timeGetTime();
-        if (playStartSystemTime > 0) t = playStartTime + currentSystemTime - playStartSystemTime;
 
         long timeDeltaMs = currentSystemTime - prevSystemTime;
         prevSystemTime = currentSystemTime;
+
+        if (playStartSystemTime > 0)
+        {
+            long playTimeMs = currentSystemTime - playStartSystemTime;
+            float playTimeBeats = msToBeats(playTimeMs, bpm);
+            t = playStartTime + playTimeBeats;
+        }
 
         cameraController.startFrame(t);
 
@@ -958,13 +967,14 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (shouldRerender)
         {
             introLoop(t);
+            lastRerenderSystemTime = currentSystemTime;
             frames++;
         }
 
         // If isPlaying changed, propagate the change to the time variables
         playStartSystemTime = isPlaying ? currentSystemTime : -1;
         playStartTime = isPlaying ? t : -1;
-        
+
         prevShouldRerender = shouldRerender;
 
         ImGui::Render();

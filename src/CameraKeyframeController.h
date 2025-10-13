@@ -7,7 +7,7 @@ class CameraKeyframeController
 {
   private:
     CameraController cameraController;
-    long currentTime = 0;
+    float currentTime = 0;
     bool isLocked = true;
 
     void displayKeyframeMarker();
@@ -17,9 +17,9 @@ class CameraKeyframeController
 
   public:
     CameraKeyframeController();
-    void startFrame(long currentTime);
+    void startFrame(float currentTime);
     void displayImGuiWindow();
-    void updateCamera(long timeDelta);
+    void updateCamera(long timeDeltaMs);
 
     void recalculateCameraTarget();
     void handleKeyDown(WPARAM wParam);

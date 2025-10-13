@@ -5,9 +5,9 @@ void initIntro(GLuint program)
     // Insert code here
 }
 
-void introLoop(long timeInMs)
+void introLoop(const float ftime)
 {
-    updateUniforms(timeInMs);
+    updateUniforms(ftime);
 
     // Insert code here - access to uniforms via glGetUniformfv
 

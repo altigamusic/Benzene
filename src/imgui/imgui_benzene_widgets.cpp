@@ -82,7 +82,7 @@ bool DragVector2(
     return value_changed;
 }
 
-bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<int>& keyframes, KeyframeMovementData* movement)
+bool KeyframeSlider(const char* label, float* data, float min, float max, std::vector<float>& keyframes, KeyframeMovementData* movement)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_FrameBg);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
@@ -105,7 +105,7 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
     ImVec2 size = ImVec2(CalcItemWidth(), CalcTextSize("0", nullptr, true).y + g.Style.FramePadding.y * 2.0f);
     ImVec2 fullSize = ImVec2(size.x + CalcTextSize(label, nullptr, true).x + g.Style.ItemInnerSpacing.x, size.y);
 
-    int snapThresholdValue = static_cast<int>(SNAP_THRESHOLD_PIXELS / size.x * (max - min));
+    float snapThresholdValue = SNAP_THRESHOLD_PIXELS / size.x * (max - min);
 
     bool value_changed = false;
     bool pressed = InvisibleButton(label, fullSize, ImGuiButtonFlags_PressedOnClick);
@@ -115,30 +115,24 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
         ImVec2 relativePos = GetIO().MousePos - pos;
         float ratio = relativePos.x / size.x;
         ratio = ImClamp(ratio, 0.0f, 1.0f);
-        int new_value = static_cast<int>(min + ratio * (max - min));
+        float new_value = min + ratio * (max - min);
 
         if (pressed)
         {
             // Check if a keyframe is being dragged
             auto kf = std::find_if(keyframes.begin(), keyframes.end(),
-                [new_value, snapThresholdValue](int kf) { return abs(kf - new_value) <= snapThresholdValue; });
+                [new_value, snapThresholdValue](float kf) { return abs(kf - new_value) <= snapThresholdValue; });
 
             draggedKeyframeIndex = kf == keyframes.end() ? -1 : kf - keyframes.begin();
         }
         else
         {
+            // Snap to whole number
+            new_value = roundf(new_value);
+
             if (draggedKeyframeIndex < 0)
             {
                 // Move the time slider
-                for (int kf : keyframes)
-                {
-                    if (abs(kf - new_value) <= snapThresholdValue)
-                    {
-                        new_value = kf;
-                        break; // This could cause problems if two keyframes are very close to each other, fix later
-                    }
-                }
-
                 if (new_value != *data)
                 {
                     *data = new_value;
@@ -166,7 +160,7 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
     // Render current value indicator
     if (*data >= min && *data <= max)
     {
-        float ratio = static_cast<float>(*data - min) / (max - min);
+        float ratio = (*data - min) / (max - min);
         float value_x = pos.x + ratio * size.x;
         ImVec2 start = ImVec2(value_x, pos.y);
 
@@ -174,12 +168,13 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
     }
 
     // Render keyframes
-    for (int kf : keyframes)
+    for (int kfIndex = 0; kfIndex < keyframes.size(); kfIndex++)
     {
+        float kf = keyframes[kfIndex];
         if (kf < min || kf > max) continue;
         const float KEYFRAME_SIZE = 10.0f;
 
-        float ratio = static_cast<float>(kf - min) / (max - min);
+        float ratio = (kf - min) / (max - min);
         float kf_x = pos.x + ratio * size.x;
 
         // Keyframes are rhombus-shaped
@@ -187,7 +182,7 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
         ImVec2 rhombus_points[4] = {rhombus_center + ImVec2(0, -KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(KEYFRAME_SIZE * 0.5f, 0),
             rhombus_center + ImVec2(0, KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(-KEYFRAME_SIZE * 0.5f, 0)};
 
-        bool isBeingDragged = draggedKeyframeIndex >= 0 && kf == keyframes[draggedKeyframeIndex];
+        bool isBeingDragged = draggedKeyframeIndex >= 0 && kfIndex == draggedKeyframeIndex;
         auto keyframeColor = isBeingDragged ? KEYFRAME_DRAGGED_COLOR : (kf == *data) ? KEYFRAME_ACTIVE_COLOR : KEYFRAME_INACTIVE_COLOR;
 
         draw_list->AddConvexPolyFilled(rhombus_points, 4, keyframeColor);
@@ -204,7 +199,7 @@ bool KeyframeSlider(const char* label, int* data, int min, int max, std::vector<
     return value_changed;
 }
 
-bool TimeSlider(const char* label, int* data, int min, int max)
+bool TimeSlider(const char* label, float* data, float min, float max)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_Text);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
@@ -228,7 +223,8 @@ bool TimeSlider(const char* label, int* data, int min, int max)
         float ratio = relativePos.x / size.x;
         ratio = ImClamp(ratio, 0.0f, 1.0f);
 
-        int new_value = static_cast<int>(min + ratio * (max - min));
+        // Round to snap
+        float new_value = roundf(min + ratio * (max - min));
 
         if (new_value != *data)
         {
@@ -244,7 +240,7 @@ bool TimeSlider(const char* label, int* data, int min, int max)
     // Render current value indicator
     if (*data >= min && *data <= max)
     {
-        float ratio = static_cast<float>(*data - min) / (max - min);
+        float ratio = (*data - min) / (max - min);
         ImVec2 start = pos + ImVec2(ratio * size.x, size.y * .5f);
 
         // Upside-down triangle
@@ -257,7 +253,7 @@ bool TimeSlider(const char* label, int* data, int min, int max)
 
     // Render time
     char buf[64];
-    ImFormatString(buf, IM_ARRAYSIZE(buf), "%d", *data);
+    ImFormatString(buf, IM_ARRAYSIZE(buf), "%.3f", *data);
 
     ImVec2 value_pos = pos + ImVec2(size.x + g.Style.FramePadding.x, g.Style.FramePadding.y);
     draw_list->AddText(value_pos, GetColorU32(ImGuiCol_Text), buf);
