@@ -92,13 +92,15 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
     const ImU32 KEYFRAME_DRAGGED_COLOR = IM_COL32(100, 200, 200, 255);
     const int SNAP_THRESHOLD_PIXELS = 4;
 
-    static int draggedKeyframeIndex = -1; // This works because only one keyframe in one slider can be dragged at a time
-
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems) return false;
 
     ImGuiContext& g = *GImGui;
     ImGuiID id = window->GetID(label);
+
+    // This works because only one keyframe in one slider can be dragged at a time
+    static int draggedKeyframeIndex = -1;
+    static ImGuiID draggedId = 0;
 
     // Calculate bounding box for the invisible button
     ImVec2 pos = window->DC.CursorPos;
@@ -112,6 +114,7 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
 
     if (pressed || IsItemActive())
     {
+        draggedId = id;
         ImVec2 relativePos = GetIO().MousePos - pos;
         float ratio = relativePos.x / size.x;
         ratio = ImClamp(ratio, 0.0f, 1.0f);
@@ -148,9 +151,10 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
             }
         }
     }
-    else
+    else if (draggedId == id)
     {
         draggedKeyframeIndex = -1;
+        draggedId = 0;
     }
 
     // Render timeline
@@ -182,7 +186,7 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
         ImVec2 rhombus_points[4] = {rhombus_center + ImVec2(0, -KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(KEYFRAME_SIZE * 0.5f, 0),
             rhombus_center + ImVec2(0, KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(-KEYFRAME_SIZE * 0.5f, 0)};
 
-        bool isBeingDragged = draggedKeyframeIndex >= 0 && kfIndex == draggedKeyframeIndex;
+        bool isBeingDragged = draggedKeyframeIndex >= 0 && kfIndex == draggedKeyframeIndex && draggedId == id;
         auto keyframeColor = isBeingDragged ? KEYFRAME_DRAGGED_COLOR : (kf == *data) ? KEYFRAME_ACTIVE_COLOR : KEYFRAME_INACTIVE_COLOR;
 
         draw_list->AddConvexPolyFilled(rhombus_points, 4, keyframeColor);
