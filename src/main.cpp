@@ -832,7 +832,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     long prevSystemTime = timeGetTime();
     long playStartSystemTime = prevSystemTime;
     long fpsStartSystemTime = prevSystemTime;
-    long lastRerenderSystemTime = -1;
     long currentSystemTime = 0;
 
     float t = 0;
@@ -942,12 +941,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::End();
 
-        if (currentSystemTime - lastRerenderSystemTime > 2000)
-        {
             // Try reloading the file
             // TODO: Maybe change the way this is done or something
             shouldRerender |= reloadFragmentShaderFromFile();
-        }
 
         if (showDebugWindow && ImGui::Begin("Shader Debug", &showDebugWindow))
         {
@@ -967,7 +963,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (shouldRerender)
         {
             introLoop(t);
-            lastRerenderSystemTime = currentSystemTime;
             frames++;
         }
 
