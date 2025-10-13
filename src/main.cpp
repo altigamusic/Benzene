@@ -585,6 +585,7 @@ void loadConfigFromFile(const std::string& filename)
     {
         UniformConfig cfg = loadConfig(filename);
         uniformList = std::move(cfg.uniformList);
+        bpm = cfg.bpm;
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
         if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
     }
@@ -598,7 +599,7 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
-        UniformConfig config{uniformList, cameraController.positionUniform, cameraController.rotationUniform};
+        UniformConfig config{(float)bpm, uniformList, cameraController.positionUniform, cameraController.rotationUniform};
         saveConfig(config, filename);
     }
     catch (const std::exception& e)
@@ -941,9 +942,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::End();
 
-            // Try reloading the file
-            // TODO: Maybe change the way this is done or something
-            shouldRerender |= reloadFragmentShaderFromFile();
+        // Try reloading the file
+        // TODO: Maybe change the way this is done or something
+        shouldRerender |= reloadFragmentShaderFromFile();
 
         if (showDebugWindow && ImGui::Begin("Shader Debug", &showDebugWindow))
         {
