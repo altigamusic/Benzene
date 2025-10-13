@@ -35,6 +35,7 @@ const char* configFileName = "config.json";
 bool showDemoWindow;
 
 int demoTimeLength = 140000;
+int bpm = 120;
 
 void resizeWindow(int width, int height)
 {
@@ -881,6 +882,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             isPlaying = false;
             shouldRerender = true;
         }
+
+        ImGui::SameLine(0, 50);
+        ImGui::Text("BPM:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80);
+        ImGui::InputInt("##BPM", &bpm);
 
         if (renderTimelines(&t, demoTimeLength))
         {
