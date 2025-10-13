@@ -133,16 +133,14 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
             // Snap to whole number
             new_value = roundf(new_value);
 
-            if (draggedKeyframeIndex < 0)
+            // Move the time slider
+            if (new_value != *data)
             {
-                // Move the time slider
-                if (new_value != *data)
-                {
-                    *data = new_value;
-                    value_changed = true;
-                }
+                *data = new_value;
+                value_changed = true;
             }
-            else if (movement != nullptr)
+
+            if (draggedKeyframeIndex >= 0 && movement != nullptr)
             {
                 // Move the dragged keyframe
                 movement->index = draggedKeyframeIndex;
