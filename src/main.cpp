@@ -488,11 +488,11 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
                                : uniform.type == UniformType::Color ? 3
                                                                     : 0;
 
-        char* items[] = {"float", "vec2", "vec3", "color"};
+        char* items[] = {"float", "vec2", "color"};
 
         if (ImGui::BeginPopupContextItem(uniform.name.c_str()))
         {
-            if (ImGui::Combo("Type", &uniformTypeIndex, items, 4))
+            if (ImGui::Combo("Type", &uniformTypeIndex, items, 3))
             {
                 switch (uniformTypeIndex)
                 {
@@ -503,9 +503,6 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
                     uniform.type = UniformType::Vec2;
                     break;
                 case 2:
-                    uniform.type = UniformType::Vec3;
-                    break;
-                case 3:
                     uniform.type = UniformType::Color;
                     break;
                 default:
