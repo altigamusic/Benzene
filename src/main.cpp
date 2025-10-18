@@ -448,6 +448,7 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
     if (uniformList.empty()) return false;
 
     bool didAnythingChange = false;
+    bool shouldReloadFragmentShader = false;
 
     ImGui::SeparatorText("Uniforms");
     ImGui::BeginChild("Uniforms", ImVec2(0, sidebarHeight / 2));
@@ -513,6 +514,7 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 
                 // Don't activate didThisUniformChange here so a keyframe won't be created
                 didAnythingChange = true;
+                shouldReloadFragmentShader = true;
                 uniform.keyframes.clear();
             }
 
@@ -572,7 +574,10 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
     if (uniformToDelete != uniformList.end())
     {
         uniformList.erase(uniformToDelete);
+        shouldReloadFragmentShader = true;
     }
+
+    if (shouldReloadFragmentShader) loadFragmentShader(currentShader.c_str());
 
     ImGui::EndChild();
 
