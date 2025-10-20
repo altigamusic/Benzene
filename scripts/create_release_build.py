@@ -37,22 +37,15 @@ UNIFORM_TYPE_TO_GL_FUNCTION = {
 
 
 def getCorrectedTension(tension, interpolation):
-    # Interpolation 0 - linear, 1 - step, 2 - tonemap, 3 - gain
-    # No factor needed for linear or step
-    if interpolation not in (2, 3):
-        return 0
-
-    a = tension
-
-    if a < 0.5:
-        a *= 2
-    else:
-        a = 1 + (a - 0.5) * 20
-
+    # Interpolation 0 = linear, 1 = step, 2 = tonemap, 3 = gain
+    # Copied from convert01ToCorrectFactor function in uniform.cpp
     if interpolation == 2:  # Tonemap
-        a -= 1
-
-    return a
+        return (tension - 0.5) * 20
+    elif interpolation == 3:  # Gain
+        return tension * 19 + 1
+    else:
+        # No factor needed for linear or step
+        return 0
 
 
 def parse_keyframe(kf: dict):

@@ -23,6 +23,7 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
 
     // This assumes a keyframe at 0
     float t = ((time - keyframes[i - 1].time) / (keyframes[i].time - keyframes[i - 1].time));
+    float a = keyframes[i].interpolationFactor;
 
     switch (keyframes[i].interpolation)
     {
@@ -30,11 +31,10 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
         t = 0;
         break;
     case 2: // Tonemap
-        t = t * (keyframes[i].interpolationFactor + 1.0) / (1.0 + keyframes[i].interpolationFactor * t);
+        t = a > 0.f ? pow(t, a + 1.f) : 1.f - pow(1.f - t, 1.f - a);
         break;
     case 3: // Gain
-        t = (t < 0.5) ? 0.5f * pow(2.0f * t, keyframes[i].interpolationFactor)
-                      : 1.0f - 0.5f * pow(2.0f * (1.0f - t), keyframes[i].interpolationFactor);
+        t = (t < 0.5) ? 0.5f * pow(2.0f * t, a) : 1.0f - 0.5f * pow(2.0f * (1.0f - t), a);
         break;
     default: // Linear
         // No action required

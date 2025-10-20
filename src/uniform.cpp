@@ -40,19 +40,19 @@ UniformValue getDefault(UniformType type)
 
 float convert01ToCorrectFactor(float interpolationFactor, KeyframeInterpolation interpolation)
 {
-    // No factor needed for linear or step
-    if (interpolation != KeyframeInterpolation::Gain && interpolation != KeyframeInterpolation::Tonemap) return 0;
-
-    // Gain is 0 - infinity with inflection at 1, tonemap is -1 - infinity with inflection at 0
     float a = interpolationFactor;
-
-    if (a < 0.5)
-        a *= 2;
-    else
-        a = 1 + (a - 0.5) * 20;
-
-    if (interpolation == KeyframeInterpolation::Tonemap) a -= 1;
-    return a;
+    switch (interpolation)
+    {
+    case KeyframeInterpolation::Tonemap:
+        // Tonemap is -inf - inf with inflection at 0
+        return (a - .5f) * 20.f;
+    case KeyframeInterpolation::Gain:
+        // Gain is 1 - inf (also has 0-1 but it looks bad and doesn't work)
+        return a * 19.f + 1.f;
+    default:
+        // No factor needed for linear or step
+        return 0;
+    }
 }
 
 float lerp(float a, float b, float x) { return a + (b - a) * x; }
@@ -63,7 +63,7 @@ float gain(float x, float factor)
     return (x < 0.5) ? a : 1.0 - a;
 }
 
-float tonemap(float x, float factor) { return x * (factor + 1.0) / (1.0 + factor * x); }
+float tonemap(float x, float factor) { return factor > 0.f ? pow(x, factor + 1.f) : 1.f - pow(1.f - x   , 1.f - factor); }
 
 Uniform::Uniform(const std::string& name, UniformType type) : name(name), type(type), location((GLuint)-1) {}
 
