@@ -266,7 +266,7 @@ bool TimeSlider(const char* label, float* data, float min, float max)
 const int NUM_POSSIBLE_INTERPOLATIONS = 4;
 const KeyframeInterpolation POSSIBLE_INTERPOLATIONS[] = {
     KeyframeInterpolation::Linear, KeyframeInterpolation::Step, KeyframeInterpolation::Tonemap, KeyframeInterpolation::Gain};
-const char* INTERPOLATION_NAMES[] = {"Linear", "Step", "Tonemap", "Gain"};
+const char* INTERPOLATION_NAMES[] = {"Linear", "Step", "Power (ease-in/ease-out)", "Gain (ease-in-out)"};
 
 static void PlotTension(KeyframeInterpolation interpolation, float tension)
 {
