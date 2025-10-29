@@ -71,6 +71,9 @@ static GLuint cameraRotationLocation = -1;
 std::string currentShader;
 std::vector<Uniform> uniformList;
 
+std::vector<std::string> groups;
+std::string currentGroup;
+
 void openDebugWindow(std::string error)
 {
     debugError += error + "\n";
@@ -180,7 +183,9 @@ void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting =
             // Inject all undeclared identifiers as uniforms and recompile
             for (const std::string& name : undeclaredIdentifiers)
             {
-                uniformList.push_back(Uniform(name, UniformType::Float));
+                Uniform new_uniform{name, UniformType::Float};
+                new_uniform.group = currentGroup;
+                uniformList.push_back(new_uniform);
             }
 
             return loadFragmentShader(fragmentShaderSource, true);
@@ -456,26 +461,18 @@ static bool window_init(WININFO* info)
 }
 #pragma endregion
 
-bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
+bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlaying)
 {
-    if (uniformList.empty()) return false;
-
     bool didAnythingChange = false;
     bool shouldReloadFragmentShader = false;
-
-    ImGui::SeparatorText("Uniforms");
-
-    // Force the uniform window to leave enough room for the camera panel
-    float maxWindowHeight = sidebarHeight - ImGui::GetTextLineHeightWithSpacing() * 20.0f;
-    float windowHeight = min(sidebarHeight / 2, maxWindowHeight);
-
-    ImGui::BeginChild("Uniforms", ImVec2(0, windowHeight));
 
     auto uniformToDelete = uniformList.end();
 
     for (auto uniformIt = uniformList.begin(); uniformIt != uniformList.end(); ++uniformIt)
     {
         Uniform& uniform = *uniformIt;
+
+        if (uniform.group != group) continue;
 
         UniformValue value = uniform.valueAtTime(time);
         bool didThisUniformChange = false;
@@ -594,6 +591,49 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 
     if (shouldReloadFragmentShader) loadFragmentShader(currentShader.c_str());
 
+    return didAnythingChange;
+}
+
+bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
+{
+    if (uniformList.empty()) return false;
+
+    bool didAnythingChange = false;
+
+    ImGui::SeparatorText("Uniforms");
+
+    // Force the uniform window to leave enough room for the camera panel
+    float maxWindowHeight = sidebarHeight - ImGui::GetTextLineHeightWithSpacing() * 20.0f;
+    float windowHeight = min(sidebarHeight / 2, maxWindowHeight);
+
+    ImGui::BeginChild("Uniforms", ImVec2(0, windowHeight));
+
+    ImGui::BeginTabBar("Uniforms", ImGuiTabBarFlags_Reorderable);
+
+    if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
+    {
+        groups.push_back("Group " + std::to_string(groups.size() + 1));
+    }
+
+    for (std::string group : groups)
+    {
+        if (ImGui::BeginTabItem(group.c_str()))
+        {
+            currentGroup = group;
+            didAnythingChange = renderSingleUniformTab(group, time, shouldKeepPlaying);
+            ImGui::EndTabItem();
+        }
+    }
+
+    if (ImGui::BeginTabItem("Unsorted"))
+    {
+        currentGroup = "";
+        didAnythingChange = renderSingleUniformTab("", time, shouldKeepPlaying);
+        ImGui::EndTabItem();
+    }
+
+    ImGui::EndTabBar();
+
     ImGui::EndChild();
 
     return didAnythingChange;
@@ -698,7 +738,7 @@ bool renderTimelines(float* time, float& minTime, float& maxTime)
     for (Uniform& uniform : uniformList)
     {
         // Display timelines only for animated uniforms, i.e. uniforms with 2+ keyframes
-        if (uniform.keyframes.size() <= 1) continue;
+        if (uniform.keyframes.size() <= 1 || uniform.group != currentGroup) continue;
 
         std::vector<float> keyframes;
 

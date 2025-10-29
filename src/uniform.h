@@ -24,6 +24,7 @@ class Uniform
     UniformType type;
     GLuint location;
     std::vector<UniformKeyframe> keyframes;
+    std::string group;
 
     UniformValue valueAtTime(float time);
     void setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation = KeyframeInterpolation::Linear,
