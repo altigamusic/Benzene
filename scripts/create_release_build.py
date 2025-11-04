@@ -64,9 +64,7 @@ def parse_config_file(filename):
         for uniform in config["uniforms"]
     ]
 
-    bpm = config["bpm"]
-
-    return uniforms, bpm
+    return uniforms, config
 
 
 def keyframe_to_array_string(keyframe: Keyframe, idx: int):
@@ -190,11 +188,14 @@ def generate_release_file(uniforms, output_filename):
         f.write(release_file_code)
 
 
-def generate_release_header(output_filename, bpm):
+def generate_release_header(output_filename, bpm, length, resolution):
     with open(output_filename, "w") as f:
         f.write(f"""#pragma once
 
 #define BPM {bpm:.2f}f
+#define DEMO_LENGTH {length:.2f}f
+#define XRES {resolution[0]}
+#define YRES {resolution[1]}
 """)
 
 
@@ -240,7 +241,7 @@ def main():
     shader_source_filename = "shaders/FragmentShader.glsl"
     shader_output_filename = "src/generated/shader.inl"
 
-    uniforms, bpm = parse_config_file(config_filename)
+    uniforms, config = parse_config_file(config_filename)
 
     if SHOULD_INJECT_CONSTS:
         animated_uniforms, consts = split_animated_and_const_uniforms(uniforms)
@@ -250,7 +251,7 @@ def main():
     generate_release_file(animated_uniforms, output_filename)
     print(f"Generated {output_filename}")
 
-    generate_release_header(output_header_filename, bpm)
+    generate_release_header(output_header_filename, config["bpm"], config["lengthInBeats"], config["resolution"])
 
     generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename)
     print(f"Generated {shader_output_filename}")

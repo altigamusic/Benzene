@@ -1,8 +1,5 @@
 // #define USEDSOUND
 // #define CLEANDESTROY          // destroy stuff (windows, glContext, ...)
-#define XRES 1920
-#define YRES 1080
-
 #define WIN32_LEAN_AND_MEAN
 #define WIN32_EXTRA_LEAN
 #include <windows.h>
@@ -95,7 +92,7 @@ void entrypoint(void)
         introLoop(t);
 
         wglSwapLayerBuffers(hDC, WGL_SWAP_MAIN_PLANE); // SwapBuffers( hDC );
-    } while (!GetAsyncKeyState(VK_ESCAPE) && t < 15000);
+    } while (!GetAsyncKeyState(VK_ESCAPE) && t < DEMO_LENGTH);
 
 #ifdef CLEANDESTROY
     sndPlaySound(0, 0);
