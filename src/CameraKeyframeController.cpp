@@ -87,6 +87,13 @@ void CameraKeyframeController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPA
     {
         cameraController.handleMouseMovement(hwndMain, uMsg, wParam, lParam);
     }
+    else
+    {
+        if (uMsg == WM_LBUTTONDOWN)
+            shouldDisplayLockWarning = true;
+        else if (uMsg == WM_LBUTTONUP)
+            shouldDisplayLockWarning = false;
+    }
 }
 
 vec3 CameraKeyframeController::getPosition() { return cameraController.position; }
@@ -131,7 +138,21 @@ void CameraKeyframeController::displayImGuiWindow()
 
     ImGui::SameLine();
     displayKeyframeMarker();
+    if ((cameraController.movementX != 0 || cameraController.movementY != 0 || cameraController.movementZ != 0 ||
+            cameraController.movementToTarget != 0 || shouldDisplayLockWarning) &&
+        isLocked)
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1, 0, 0, 1), "Camera is locked");
+    }
 
+    ImGui::NewLine();
+    ImGui::Text("WASD: Move camera");
+    ImGui::Text("Q/E: Move camera up/down");
+    ImGui::Text("R/F: Move camera forward/back on XZ plane");
+    ImGui::Text("Left-drag: Rotate camera");
+
+    ImGui::NewLine();
     ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", cameraController.position.x, cameraController.position.y, cameraController.position.z);
     ImGui::Text("Camera Rotation: %.2f, %.2f", cameraController.xAngle, cameraController.yAngle);
     ImGui::Text("Camera Direction: %.2f, %.2f, %.2f", cameraController.target.x - cameraController.position.x,
@@ -142,6 +163,6 @@ void CameraKeyframeController::displayImGuiWindow()
         cameraController.resetCamera();
     }
 
-    ImGui::SliderFloat("Movement Scale", &cameraController.movementScale, 1, 10);
+    ImGui::SliderFloat("Movement Speed", &cameraController.movementScale, 1, 10);
     ImGui::EndChild();
 }

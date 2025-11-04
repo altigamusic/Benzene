@@ -9,6 +9,7 @@ class CameraKeyframeController
     CameraController cameraController;
     float currentTime = 0;
     bool isLocked = true;
+    bool shouldDisplayLockWarning = false;
 
     void displayKeyframeMarker();
     UniformValue getPositionValue();
