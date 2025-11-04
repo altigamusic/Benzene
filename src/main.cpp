@@ -803,7 +803,7 @@ void renderSettingsWindow()
     didResolutionChange |= ImGui::InputInt("##yres", &viewportHeight, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
     if (didResolutionChange) resizeWindow(windowWidth, windowHeight);
-
+    
     ImGui::End();
 }
 
@@ -941,8 +941,15 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SameLine(0, 50);
         ImGui::Text("BPM:");
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(80);
-        ImGui::InputInt("##BPM", &bpm);
+        ImGui::SetNextItemWidth(50);
+        ImGui::DragInt("##BPM", &bpm, 1.0f, 10, 5000);
+
+        ImGui::SameLine(0, 50);
+        ImGui::Text("Length:");
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(50);
+        ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
 
         if (renderTimelines(&t, demoTimeLength))
         {
