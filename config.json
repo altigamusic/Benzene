@@ -1,1 +1,1 @@
-{"bpm":120.0,"lengthInBeats":100.0,"resolution":[800,600],"uniforms":[{"keyframes":[],"name":"_cp","type":"vec3"},{"keyframes":[],"name":"_cr","type":"vec2"}],"version":1}
+{"bpm":120.0,"lengthInBeats":100.0,"resolution":[800,600],"uniforms":[{"keyframes":[{"interpolation":0,"tension":0.5,"time":0.0,"value":[-3.7170000076293945,4.539000034332275,3.571000099182129]}],"name":"_cp","type":"vec3"},{"keyframes":[{"interpolation":0,"tension":0.5,"time":0.0,"value":[3.875999927520752,0.6480000019073486]}],"name":"_cr","type":"vec2"}],"version":1}
