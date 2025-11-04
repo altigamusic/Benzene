@@ -790,32 +790,19 @@ void renderDebugWindow()
 
 void renderSettingsWindow()
 {
-    static int newResX = viewportWidth;
-    static int newResY = viewportHeight;
+    if (!ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoCollapse)) return;
 
-    if (!ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoCollapse))
-    {
-        newResX = viewportWidth;
-        newResY = viewportHeight;
-        return;
-    }
-
-    bool didChange = false;
+    bool didResolutionChange = false;
 
     ImGui::Text("Resolution: ");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    ImGui::InputInt(" x ##xres", &newResX, 0);
+    didResolutionChange |= ImGui::InputInt(" x ##xres", &viewportWidth, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    ImGui::InputInt("##yres", &newResY, 0);
+    didResolutionChange |= ImGui::InputInt("##yres", &viewportHeight, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
-    if (ImGui::Button("Save"))
-    {
-        viewportWidth = newResX;
-        viewportHeight = newResY;
-        resizeWindow(windowWidth, windowHeight);
-    }
+    if (didResolutionChange) resizeWindow(windowWidth, windowHeight);
 
     ImGui::End();
 }
