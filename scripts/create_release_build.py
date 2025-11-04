@@ -265,7 +265,8 @@ def main():
 
     generate_release_header(output_header_filename, config["bpm"], config["lengthInBeats"], config["resolution"])
 
-    generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename)
+    generate_minified_shader(shader_source_filename, animated_uniforms, consts,
+                             shader_output_filename, config["resolution"])
     print(f"Generated {shader_output_filename}")
 
 
