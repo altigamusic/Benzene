@@ -3,6 +3,8 @@
 #include <fstream>
 #include "nlohmann/json.hpp"
 
+constexpr int CURRENT_VERSION = 1;
+
 using json = nlohmann::json;
 
 static UniformType getUniformTypeFromString(const std::string& typeString)
@@ -211,7 +213,8 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
         {"uniforms",      uniformListJson                                       },
         {"bpm",           config.bpm                                            },
         {"lengthInBeats", config.lengthInBeats                                  },
-        {"resolution",    json ::array({config.resolutionX, config.resolutionY})}
+        {"resolution",    json ::array({config.resolutionX, config.resolutionY})},
+        {"version",       CURRENT_VERSION                                       }
     };
 
     file << configJson;

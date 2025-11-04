@@ -1,1 +1,1 @@
-{"bpm":120.0,"lengthInBeats":100.0,"resolution":[800,600],"uniforms":[{"keyframes":[],"name":"_cp","type":"vec3"},{"keyframes":[],"name":"_cr","type":"vec2"}]}
+{"bpm":120.0,"lengthInBeats":100.0,"resolution":[800,600],"uniforms":[{"keyframes":[],"name":"_cp","type":"vec3"},{"keyframes":[],"name":"_cr","type":"vec2"}],"version":1}
