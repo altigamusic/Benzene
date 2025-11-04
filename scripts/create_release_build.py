@@ -159,11 +159,14 @@ def generate_release_file_code(uniforms):
         kf_index += len(params)
 
         updates.append(f"    {gl_func}(UNIFORMS[{i}], {param_string});")
+
+        uniform_definition_line = f"GLuint UNIFORMS[{len(uniforms)}] = {{0}};"
+
     uniform_updates = "\n".join(updates)
 
     return f"""#include "../release.h"
 
-GLuint UNIFORMS[{len(uniforms)}] = {{0}};
+{uniform_definition_line if len(uniforms) > 0 else ""}
 GLuint timeUniformLocation = 0;
 
 {keyframe_arrays}
