@@ -455,7 +455,12 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
     bool shouldReloadFragmentShader = false;
 
     ImGui::SeparatorText("Uniforms");
-    ImGui::BeginChild("Uniforms", ImVec2(0, sidebarHeight / 2));
+
+    // Force the uniform window to leave enough room for the camera panel
+    float maxWindowHeight = sidebarHeight - ImGui::GetTextLineHeightWithSpacing() * 20.0f;
+    float windowHeight = min(sidebarHeight / 2, maxWindowHeight);
+
+    ImGui::BeginChild("Uniforms", ImVec2(0, windowHeight));
 
     auto uniformToDelete = uniformList.end();
 
