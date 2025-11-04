@@ -64,6 +64,18 @@ def parse_config_file(filename):
         for uniform in config["uniforms"]
     ]
 
+    # Guarantee keyframe at 0
+    # Necessary for runtime algorithm to work correctly
+    for uniform in uniforms:
+        if uniform.keyframes[0].time > 0:
+            if len(uniform.keyframes) > 1:
+                # Copy the first keyframe to time 0
+                uniform.keyframes.insert(0, Keyframe(
+                    0, uniform.keyframes[0].values, uniform.keyframes[0].interpolation, uniform.keyframes[0].tension))
+            else:
+                # This uniform is a const so moving the keyframe to 0 will have no effect
+                uniform.keyframes[0].time = 0
+
     return uniforms, config
 
 
