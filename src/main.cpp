@@ -32,6 +32,9 @@ int timelineHeight = 200;
 CameraKeyframeController cameraController;
 const char* configFileName = "config.json";
 
+int releaseResolutionX;
+int releaseResolutionY;
+
 bool showDemoWindow;
 
 int demoTimeLength = 140;
@@ -589,8 +592,8 @@ void loadConfigFromFile(const std::string& filename)
         UniformConfig cfg = loadConfig(filename);
         uniformList = std::move(cfg.uniformList);
         bpm = cfg.bpm;
-        viewportWidth = cfg.resolutionX;
-        viewportHeight = cfg.resolutionY;
+        releaseResolutionX = cfg.resolutionX;
+        releaseResolutionY = cfg.resolutionY;
         demoTimeLength = cfg.lengthInBeats;
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
         if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
@@ -605,7 +608,7 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
-        UniformConfig config{(float)bpm, (float)demoTimeLength, viewportWidth, viewportHeight, uniformList, cameraController.positionUniform,
+        UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, uniformList, cameraController.positionUniform,
             cameraController.rotationUniform};
         saveConfig(config, filename);
     }
@@ -798,10 +801,10 @@ void renderSettingsWindow()
     ImGui::Text("Resolution: ");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    didResolutionChange |= ImGui::InputInt(" x ##xres", &viewportWidth, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
+    didResolutionChange |= ImGui::InputInt(" x ##xres", &releaseResolutionX, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    didResolutionChange |= ImGui::InputInt("##yres", &viewportHeight, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
+    didResolutionChange |= ImGui::InputInt("##yres", &releaseResolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
     if (didResolutionChange) resizeWindow(windowWidth, windowHeight);
     
