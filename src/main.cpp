@@ -774,6 +774,16 @@ bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool for
     return false;
 }
 
+void renderDebugWindow()
+{
+    if (ImGui::Begin("Shader Debug", &showDebugWindow))
+    {
+        ImGui::TextUnformatted(debugError.c_str());
+        ImGui::End();
+        if (!showDebugWindow) closeDebugWindow();
+    }
+}
+
 bool renderMenuBar()
 {
     bool didChange = false;
@@ -871,6 +881,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::NewFrame();
 
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
+        if (showDebugWindow) renderDebugWindow();
 
         // Move camera by keyboard input
         cameraController.updateCamera(timeDeltaMs);
@@ -947,13 +958,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         // Try reloading the file
         // TODO: Maybe change the way this is done or something
         shouldRerender |= reloadFragmentShaderFromFile();
-
-        if (showDebugWindow && ImGui::Begin("Shader Debug", &showDebugWindow))
-        {
-            ImGui::TextUnformatted(debugError.c_str());
-            ImGui::End();
-            if (!showDebugWindow) closeDebugWindow();
-        }
 
         // If the render stopped just now, render to the back buffer
         if (prevShouldRerender && !shouldRerender)
