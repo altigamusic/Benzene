@@ -122,10 +122,14 @@ void CameraKeyframeController::displayImGuiWindow()
     ImGui::SeparatorText("Camera");
     ImGui::BeginChild("Camera");
 
-    if (ImGui::Selectable("Locked", &isLocked) && isLocked)
+    if (ImGui::Button(isLocked ? "Unlock" : "Lock"))
+    {
+        isLocked = !isLocked;
         // If the user locked the camera, reset its position
-        moveCameraToKeyframe();
+        if (isLocked) moveCameraToKeyframe();
+    }
 
+    ImGui::SameLine();
     displayKeyframeMarker();
 
     ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", cameraController.position.x, cameraController.position.y, cameraController.position.z);
