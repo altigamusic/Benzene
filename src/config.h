@@ -7,6 +7,7 @@
 struct UniformConfig
 {
     float bpm;
+    float lengthInBeats;
     int resolutionX;
     int resolutionY;
     std::vector<Uniform> uniformList;

@@ -131,6 +131,7 @@ UniformConfig loadConfig(const std::string& filename)
 
     config.bpm = configJson["bpm"];
 
+    config.lengthInBeats = configJson["lengthInBeats"];
     config.resolutionX = configJson["resolution"][0];
     config.resolutionY = configJson["resolution"][1];
 
@@ -207,9 +208,10 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
     if (config.cameraRotation.has_value()) uniformListJson.push_back(uniformToJson(config.cameraRotation.value()));
 
     json configJson = {
-        {"uniforms",   uniformListJson                                       },
-        {"bpm",        config.bpm                                            },
-        {"resolution", json ::array({config.resolutionX, config.resolutionY})}
+        {"uniforms",      uniformListJson                                       },
+        {"bpm",           config.bpm                                            },
+        {"lengthInBeats", config.lengthInBeats                                  },
+        {"resolution",    json ::array({config.resolutionX, config.resolutionY})}
     };
 
     file << configJson;

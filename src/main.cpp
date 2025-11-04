@@ -591,6 +591,7 @@ void loadConfigFromFile(const std::string& filename)
         bpm = cfg.bpm;
         viewportWidth = cfg.resolutionX;
         viewportHeight = cfg.resolutionY;
+        demoTimeLength = cfg.lengthInBeats;
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
         if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
     }
@@ -604,8 +605,8 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
-        UniformConfig config{
-            (float)bpm, viewportWidth, viewportHeight, uniformList, cameraController.positionUniform, cameraController.rotationUniform};
+        UniformConfig config{(float)bpm, (float)demoTimeLength, viewportWidth, viewportHeight, uniformList, cameraController.positionUniform,
+            cameraController.rotationUniform};
         saveConfig(config, filename);
     }
     catch (const std::exception& e)
