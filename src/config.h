@@ -7,6 +7,8 @@
 struct UniformConfig
 {
     float bpm;
+    int resolutionX;
+    int resolutionY;
     std::vector<Uniform> uniformList;
     std::optional<Uniform> cameraPosition;
     std::optional<Uniform> cameraRotation;
