@@ -51,6 +51,7 @@ void resizeWindow(int width, int height)
 
 bool showDebugWindow = false;
 std::string debugError;
+bool showSettingsWindow = false;
 
 bool isPlaying = true;
 bool isSpaceDown;
@@ -784,6 +785,38 @@ void renderDebugWindow()
     }
 }
 
+void renderSettingsWindow()
+{
+    static int newResX = viewportWidth;
+    static int newResY = viewportHeight;
+
+    if (!ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoCollapse))
+    {
+        newResX = viewportWidth;
+        newResY = viewportHeight;
+        return;
+    }
+
+    bool didChange = false;
+
+    ImGui::Text("Resolution: ");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50);
+    ImGui::InputInt(" x ##xres", &newResX, 0);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50);
+    ImGui::InputInt("##yres", &newResY, 0);
+
+    if (ImGui::Button("Save"))
+    {
+        viewportWidth = newResX;
+        viewportHeight = newResY;
+        resizeWindow(windowWidth, windowHeight);
+    }
+
+    ImGui::End();
+}
+
 bool renderMenuBar()
 {
     bool didChange = false;
@@ -801,6 +834,10 @@ bool renderMenuBar()
             if (ImGui::MenuItem("Save Uniforms"))
             {
                 saveConfigToFile(configFileName);
+            }
+            if (ImGui::MenuItem("Settings"))
+            {
+                showSettingsWindow = true;
             }
 
             ImGui::EndMenu();
@@ -881,6 +918,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::NewFrame();
 
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
+        if (showSettingsWindow) renderSettingsWindow();
         if (showDebugWindow) renderDebugWindow();
 
         // Move camera by keyboard input
