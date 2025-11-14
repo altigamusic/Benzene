@@ -86,7 +86,7 @@ void closeDebugWindow()
 std::vector<std::string> getUndeclaredIdentifiers(std::string error)
 {
     std::regex undeclaredIdentifierRegex(
-        "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared identifier", std::regex::icase);
+        "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared identifier|[uU]ndefined\\s+[Vv]ariable\\s+['\"](\\w+)['\"]", std::regex::icase);
 
     std::vector<std::string> result;
     std::smatch match;
@@ -96,8 +96,15 @@ std::vector<std::string> getUndeclaredIdentifiers(std::string error)
     {
         if (match.size() > 1)
         {
-            // Only one group will match something and the other(s) will be empty, so we just add them together
-            result.push_back(match[1].str() + match[2].str());
+            // Only one group will match something and the other(s) will be empty
+            for (size_t i = 1; i < match.size(); ++i)
+            {
+                if (match[i].matched)
+                {
+                    result.push_back(match[i].str());
+                    break;
+                }
+            }
         }
         searchStart = match.suffix().first;
     }
