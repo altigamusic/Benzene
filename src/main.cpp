@@ -659,11 +659,11 @@ std::vector<int> getAllKeyframes()
     return keyframes;
 }
 
-bool renderTimelines(float* time, float maxTime)
+bool renderTimelines(float* time, float minTime, float maxTime)
 {
     bool didChange = false;
 
-    didChange |= TimeSlider("Time", time, 0, maxTime);
+    didChange |= TimeSlider("Time", time, minTime, maxTime);
 
     if (cameraController.positionUniform.keyframes.size() > 1)
     {
@@ -675,7 +675,7 @@ bool renderTimelines(float* time, float maxTime)
             keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
-        if (KeyframeSlider("Camera", time, 0, maxTime, keyframes, &kfMovement))
+        if (KeyframeSlider("Camera", time, minTime, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
             {
@@ -704,7 +704,7 @@ bool renderTimelines(float* time, float maxTime)
 
         KeyframeMovementData kfMovement;
 
-        if (KeyframeSlider(uniform.name.c_str(), time, 0, maxTime, keyframes, &kfMovement))
+        if (KeyframeSlider(uniform.name.c_str(), time, minTime, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
             {
@@ -885,6 +885,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     cameraController.recalculateCameraTarget();
     loadConfigFromFile(configFileName);
 
+    float timelineViewStart = 0.0f;
+    float timelineViewEnd = demoTimeLength;
+
     long prevSystemTime = timeGetTime();
     long playStartSystemTime = prevSystemTime;
     long fpsStartSystemTime = prevSystemTime;
@@ -967,7 +970,14 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextItemWidth(50);
         ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
 
-        if (renderTimelines(&t, demoTimeLength))
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(50);
+        ImGui::DragFloat("start", &timelineViewStart, 0.1f, 0.0f, timelineViewEnd - 1.0f);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(50);
+        ImGui::DragFloat("end", &timelineViewEnd, 0.1f, timelineViewStart + 1.0f, demoTimeLength);
+
+        if (renderTimelines(&t, timelineViewStart, timelineViewEnd))
         {
             shouldRerender = true;
             frames = -1;
