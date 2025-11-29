@@ -659,10 +659,11 @@ std::vector<int> getAllKeyframes()
     return keyframes;
 }
 
-bool renderTimelines(float* time, float minTime, float maxTime)
+bool renderTimelines(float* time, float& minTime, float& maxTime)
 {
     bool didChange = false;
 
+    ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
     didChange |= TimeSlider("Time", time, minTime, maxTime);
 
     if (cameraController.positionUniform.keyframes.size() > 1)
@@ -969,13 +970,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SameLine();
         ImGui::SetNextItemWidth(50);
         ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
-
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(50);
-        ImGui::DragFloat("start", &timelineViewStart, 0.1f, 0.0f, timelineViewEnd - 1.0f);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(50);
-        ImGui::DragFloat("end", &timelineViewEnd, 0.1f, timelineViewStart + 1.0f, demoTimeLength);
 
         if (renderTimelines(&t, timelineViewStart, timelineViewEnd))
         {

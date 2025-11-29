@@ -7,6 +7,12 @@
 #include "imgui_internal.h"
 #include <vector>
 
+#ifdef WINDOWS
+#include <windows.h>
+#undef min
+#undef max
+#endif
+
 using namespace ImGui;
 
 static bool InvisibleButton(const char* str_id, const ImVec2& size_arg, bool* hovered, bool* held, ImGuiButtonFlags flags = 0)
@@ -391,4 +397,87 @@ bool PlayPauseButton(bool shouldDrawPauseIcon)
     }
 
     return didChange;
+}
+
+bool ZoomPanSlider(const char* label, float* start, float* end, float min, float max)
+{
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems) return false;
+    ImGuiContext& g = *GImGui;
+    ImGuiID id = window->GetID(label);
+
+    // Calculate bounding box for the invisible button
+    ImVec2 pos = window->DC.CursorPos;
+    ImVec2 size = ImVec2(CalcItemWidth(), CalcTextSize("0", nullptr, true).y + g.Style.FramePadding.y * 2.0f);
+    ImVec2 fullSize = ImVec2(size.x + CalcTextSize(label, nullptr, true).x + g.Style.ItemInnerSpacing.x, size.y);
+
+    bool hovered, held;
+
+    bool valueChanged = false;
+
+    bool pressed = InvisibleButton(label, fullSize, &hovered, &held);
+
+    if (!pressed && IsItemActive())
+    {
+        auto& io = GetIO();
+
+        // Lock and hide the mouse while dragging
+        ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+        ImVec2 mouseDelta = io.MousePos - io.MouseClickedPos[0];
+        // Teleport only after the mouse moved, because otherwise the teleportation overrides the move
+        if (mouseDelta != ImVec2(0, 0)) TeleportMousePos(io.MouseClickedPos[0]);
+
+        float range = *end - *start;
+        float panAmount = mouseDelta.x / size.x * (max - min);
+        float zoomAmount = mouseDelta.y / size.x * (max - min);
+        float newStart = *start + panAmount;
+        float newEnd = *end + panAmount;
+
+        float newRange = std::max(0.01f, range - zoomAmount);
+        float center = (newStart + newEnd) / 2.0f;
+        newStart = center - newRange / 2.0f;
+        newEnd = center + newRange / 2.0f;
+
+        // Clamp to min/max
+        if (newStart < min)
+        {
+            newStart = min;
+            newEnd = std::min(max, newStart + newRange);
+        }
+        else if (newEnd > max)
+        {
+            newEnd = max;
+            newStart = std::max(min, newEnd - newRange);
+        }
+
+        if (newStart != *start || newEnd != *end)
+        {
+            *start = newStart;
+            *end = newEnd;
+            valueChanged = true;
+        }
+    }
+
+    // Render timeline
+    ImDrawList* drawList = GetWindowDrawList();
+    drawList->AddRect(pos, pos + size, GetColorU32(ImGuiCol_FrameBg), 0.0f, ImDrawFlags_None, 1.0f);
+
+    // Render current range indicator
+    if (*start >= min && *end <= max)
+    {
+        float startRatio = (*start - min) / (max - min);
+        float endRatio = (*end - min) / (max - min);
+        float startX = pos.x + startRatio * size.x;
+        float endX = pos.x + endRatio * size.x;
+        ImVec2 rectMin = ImVec2(startX, pos.y);
+        ImVec2 rectMax = ImVec2(endX, pos.y + size.y);
+        drawList->AddRectFilled(rectMin, rectMax,
+            GetColorU32(held      ? ImGuiCol_ScrollbarGrabActive
+                        : hovered ? ImGuiCol_ScrollbarGrabHovered
+                                  : ImGuiCol_ScrollbarGrab));
+    }
+
+    ImGui::SetItemTooltip("Left/Right: Pan\nUp/Down: Zoom");
+
+    return valueChanged;
 }

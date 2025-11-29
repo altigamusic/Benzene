@@ -17,3 +17,4 @@ bool TimeSlider(const char* label, float* data, float min, float max);
 bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension);
 
 bool PlayPauseButton(bool shouldDrawPauseIcon);
+bool ZoomPanSlider(const char* label, float* start, float* end, float min, float max);
