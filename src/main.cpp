@@ -608,28 +608,72 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 
     ImGui::BeginChild("Uniforms", ImVec2(0, windowHeight));
 
-    ImGui::BeginTabBar("Uniforms", ImGuiTabBarFlags_Reorderable);
+    ImGui::BeginTabBar("Uniforms");
 
     if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
     {
         groups.push_back("Group " + std::to_string(groups.size() + 1));
     }
 
-    for (std::string group : groups)
-    {
-        if (ImGui::BeginTabItem(group.c_str()))
-        {
-            currentGroup = group;
-            didAnythingChange = renderSingleUniformTab(group, time, shouldKeepPlaying);
-            ImGui::EndTabItem();
-        }
-    }
+    static int currentlyRenamedGroup = -1;
 
     if (ImGui::BeginTabItem("Unsorted"))
     {
         currentGroup = "";
         didAnythingChange = renderSingleUniformTab("", time, shouldKeepPlaying);
         ImGui::EndTabItem();
+    }
+
+    for (int i = 0; i < groups.size(); i++)
+    {
+        std::string group = groups[i];
+
+        if (ImGui::BeginTabItem(group.c_str()))
+        {
+            currentGroup = group;
+            didAnythingChange = renderSingleUniformTab(group, time, shouldKeepPlaying);
+
+            if (ImGui::BeginPopupContextItem())
+            {
+                if (ImGui::Selectable("Rename"))
+                {
+                    currentlyRenamedGroup = i;
+                    ImGui::CloseCurrentPopup();
+                    ImGui::OpenPopup("Rename Group");
+                }
+
+                ImGui::EndPopup();
+            }
+            ImGui::EndTabItem();
+        }
+    }
+
+    if (currentlyRenamedGroup >= 0)
+    {
+        ImGui::Begin("Rename Group", NULL, ImGuiWindowFlags_AlwaysAutoResize);
+
+        char newGroupName[128] = {0};
+        std::strncpy(newGroupName, groups[currentlyRenamedGroup].c_str(), 127);
+        if (ImGui::InputText("New Name", newGroupName, 128))
+        {
+            // Rename the group and uniforms
+            groups[currentlyRenamedGroup] = newGroupName;
+
+            for (Uniform& uniform : uniformList)
+            {
+                if (uniform.group == groups[currentlyRenamedGroup])
+                {
+                    uniform.group = newGroupName;
+                }
+            }
+        }
+
+        if (ImGui::Button("OK"))
+        {
+            currentlyRenamedGroup = -1;
+        }
+
+        ImGui::End();
     }
 
     ImGui::EndTabBar();
@@ -937,7 +981,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     long fpsStartSystemTime = prevSystemTime;
     long currentSystemTime = 0;
 
-    float t = 0; // The current time, in beats
+    float t = 0;             // The current time, in beats
     float playStartTime = 0; // The time at which playback started, in beats
     int frames = 0;
 
