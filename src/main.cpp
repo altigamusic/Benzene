@@ -897,8 +897,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     long fpsStartSystemTime = prevSystemTime;
     long currentSystemTime = 0;
 
-    float t = 0;
-    float playStartTime = 0;
+    float t = 0; // The current time, in beats
+    float playStartTime = 0; // The time at which playback started, in beats
     int frames = 0;
 
     bool prevShouldRerender = false;
@@ -915,6 +915,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             long playTimeMs = currentSystemTime - playStartSystemTime;
             float playTimeBeats = msToBeats(playTimeMs, bpm);
             t = playStartTime + playTimeBeats;
+            t = fmodf(t, demoTimeLength);
         }
 
         cameraController.startFrame(t);
