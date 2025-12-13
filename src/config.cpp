@@ -217,7 +217,7 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
         {"version",       CURRENT_VERSION                                       }
     };
 
-    file << configJson;
+    file << std::setw(2) << configJson;
 
     file.close();
 
