@@ -86,7 +86,9 @@ void closeDebugWindow()
 std::vector<std::string> getUndeclaredIdentifiers(std::string error)
 {
     std::regex undeclaredIdentifierRegex(
-        "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared identifier|[uU]ndefined\\s+[Vv]ariable\\s+['\"](\\w+)['\"]", std::regex::icase);
+        "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared "
+        "identifier|[uU]ndefined\\s+[Vv]ariable\\s+['\"](\\w+)['\"]",
+        std::regex::icase);
 
     std::vector<std::string> result;
     std::smatch match;
@@ -620,8 +622,8 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
-        UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, uniformList, cameraController.positionUniform,
-            cameraController.rotationUniform};
+        UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, uniformList,
+            cameraController.positionUniform, cameraController.rotationUniform};
         saveConfig(config, filename);
     }
     catch (const std::exception& e)
@@ -820,7 +822,7 @@ void renderSettingsWindow()
     didResolutionChange |= ImGui::InputInt("##yres", &releaseResolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
     if (didResolutionChange) resizeWindow(windowWidth, windowHeight);
-    
+
     ImGui::End();
 }
 
