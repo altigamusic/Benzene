@@ -863,6 +863,7 @@ long beatsToMs(float beats, float bpm) { return 60000 / bpm * beats; }
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
+    bool showSaveDialog = false;
     bool done = false;
     WININFO* info = &wininfo;
 
@@ -920,7 +921,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
-            if (msg.message == WM_QUIT) done = true;
+            if (msg.message == WM_QUIT) showSaveDialog = true;
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
@@ -1036,6 +1037,37 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         prevShouldRerender = shouldRerender;
 
+        if (showSaveDialog)
+        {
+            // Place the save dialog in the center-top
+            ImGuiIO& io = ImGui::GetIO();
+            ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.125f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+
+            if (ImGui::Begin("Save?", &showSaveDialog, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
+            {
+                ImGui::Text("Save changes before exiting?");
+                if (ImGui::Button("Yes"))
+                {
+                    saveConfigToFile(configFileName);
+                    showSaveDialog = false;
+                    done = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("No"))
+                {
+                    showSaveDialog = false;
+                    done = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel"))
+                {
+                    showSaveDialog = false;
+                }
+
+                ImGui::End();
+            }
+        }
+
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -1045,8 +1077,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
-
-    saveConfigToFile(configFileName);
 
     sndPlaySound(0, 0);
     window_end(info);
