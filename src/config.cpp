@@ -140,6 +140,7 @@ UniformConfig loadConfig(const std::string& filename)
     for (auto& uniformJson : configJson["uniforms"])
     {
         Uniform newUniform(uniformJson["name"], getUniformTypeFromString(uniformJson["type"]));
+        newUniform.group = uniformJson.value("group", "");
 
         for (auto& keyframeJson : uniformJson["keyframes"])
         {
@@ -183,11 +184,14 @@ json uniformToJson(const Uniform& uniform)
         });
     }
 
-    return {
+    json uniformJson = {
         {"name",      uniform.name                     },
         {"type",      uniformTypeToString(uniform.type)},
-        {"keyframes", keyframesJson                    }
+        {"keyframes", keyframesJson                    },
     };
+    if (!uniform.group.empty()) uniformJson["group"] = uniform.group;
+
+    return uniformJson;
 }
 
 bool saveConfig(const UniformConfig& config, const std::string& filename)
@@ -214,7 +218,7 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
         {"bpm",           config.bpm                                            },
         {"lengthInBeats", config.lengthInBeats                                  },
         {"resolution",    json ::array({config.resolutionX, config.resolutionY})},
-        {"version",       CURRENT_VERSION                                       }
+        {"version",       CURRENT_VERSION                                       },
     };
 
     file << std::setw(2) << configJson;
