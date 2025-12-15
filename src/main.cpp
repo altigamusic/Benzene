@@ -1184,7 +1184,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
             if (ImGui::Begin("Save?", &showSaveDialog, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
             {
-                ImGui::Text("Save changes before exiting?");
+                ImGui::Text("Save changes before closing?");
                 if (ImGui::Button("Yes"))
                 {
                     saveConfigToFile(configFileName);
