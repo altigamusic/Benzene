@@ -18,6 +18,7 @@
 #include "CameraKeyframeController.h"
 #include "uniform.h"
 #include <regex>
+#include <set>
 #include "imgui/imgui_benzene_widgets.h"
 #include "config.h"
 
@@ -695,6 +696,14 @@ void loadConfigFromFile(const std::string& filename)
         demoTimeLength = cfg.lengthInBeats;
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
         if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
+
+        // Load groups
+        std::set<std::string> groupSet;
+        for (const Uniform& u : uniformList)
+        {
+            if (!u.group.empty()) groupSet.insert(u.group);
+        }
+        groups = std::vector<std::string>(groupSet.begin(), groupSet.end());
     }
     catch (const std::exception& e)
     {
