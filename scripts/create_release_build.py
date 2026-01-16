@@ -246,7 +246,7 @@ vec2 fragCoord = gl_FragCoord.xy;
 
 
 def main():
-    os.mkdir("src/generated", exist_ok=True)
+    os.makedirs("src/generated", exist_ok=True)
     config_filename = "config.json"
     output_filename = "src/generated/release.cpp"
     output_header_filename = "src/generated/release_config.h"
