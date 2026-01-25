@@ -668,11 +668,11 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
     for (int i = 0; i < groups.size(); i++)
     {
         std::string group = groups[i];
+        bool openRenameDialog = false;
 
         if (ImGui::BeginTabItem(group.c_str()))
         {
             currentGroup = group;
-            didAnythingChange = renderSingleUniformTab(group, time, shouldKeepPlaying);
 
             if (ImGui::BeginPopupContextItem())
             {
@@ -680,41 +680,39 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
                 {
                     currentlyRenamedGroup = i;
                     ImGui::CloseCurrentPopup();
+                    
                     ImGui::OpenPopup("Rename Group");
+                    openRenameDialog = true;
                 }
 
                 ImGui::EndPopup();
             }
+
+            didAnythingChange = renderSingleUniformTab(group, time, shouldKeepPlaying);
             ImGui::EndTabItem();
         }
+
+        // This is necessary because OpenPopup needs to be called from the outside of the stack
+        if (openRenameDialog) ImGui::OpenPopup("Rename Group");
     }
 
-    if (currentlyRenamedGroup >= 0)
+    result = nameDialog("Rename Group");
+
+    if (result.has_value())
     {
-        ImGui::Begin("Rename Group", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-
-        char newGroupName[128] = {0};
-        std::strncpy(newGroupName, groups[currentlyRenamedGroup].c_str(), 127);
-        if (ImGui::InputText("New Name", newGroupName, 128))
+        // Rename the group and uniforms
+        // Uniforms before the group so we don't forget the old name
+        for (Uniform& uniform : uniformList)
         {
-            // Rename the group and uniforms
-            groups[currentlyRenamedGroup] = newGroupName;
-
-            for (Uniform& uniform : uniformList)
+            if (uniform.group == groups[currentlyRenamedGroup])
             {
-                if (uniform.group == groups[currentlyRenamedGroup])
-                {
-                    uniform.group = newGroupName;
-                }
+                uniform.group = result.value();
             }
         }
 
-        if (ImGui::Button("OK"))
-        {
-            currentlyRenamedGroup = -1;
-        }
+        groups[currentlyRenamedGroup] = result.value();
 
-        ImGui::End();
+        currentlyRenamedGroup = -1;
     }
 
     ImGui::EndTabBar();
