@@ -621,12 +621,18 @@ std::optional<std::string> nameDialog(char* str_id)
 
     if (ImGui::BeginPopup(str_id))
     {
-        ImGui::InputText("Name", name, 50);
+        if (ImGui::IsWindowAppearing())
+        {
+            // Window just opened - clear name and focus
+            name[0] = 0;
+            ImGui::SetKeyboardFocusHere(0);
+        }
 
-        if (ImGui::Button("OK"))
+        bool wasEnterPressed = ImGui::InputText("Name", name, 50, ImGuiInputTextFlags_EnterReturnsTrue);
+
+        if (ImGui::Button("OK") || wasEnterPressed)
         {
             result = std::string(name);
-            name[0] = 0; // Clear name
             ImGui::CloseCurrentPopup();
         }
 
