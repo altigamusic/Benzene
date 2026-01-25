@@ -531,13 +531,14 @@ bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlayi
                 uniform.keyframes.clear();
             }
 
-            int uniformGroupIndex = uniform.group.empty() ? 0 : std::find(groups.begin(), groups.end(), uniform.group) - groups.begin();
+            int uniformGroupIndex = uniform.group.empty() ? 0 : std::find(groups.begin(), groups.end(), uniform.group) - groups.begin() + 1;
 
             // Combo takes an array, so convert the groups to a const char*[]
             std::vector<const char*> groupItems;
             groupItems.reserve(groups.size() + 1);
             groupItems.push_back("(no group)");
-            for (const std::string& g : groups) groupItems.push_back(g.c_str());
+            for (const std::string& g : groups)
+                groupItems.push_back(g.c_str());
 
             if (ImGui::Combo("Group", &uniformGroupIndex, groupItems.data(), groupItems.size()))
             {
@@ -680,7 +681,7 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
                 {
                     currentlyRenamedGroup = i;
                     ImGui::CloseCurrentPopup();
-                    
+
                     ImGui::OpenPopup("Rename Group");
                     openRenameDialog = true;
                 }
