@@ -613,6 +613,28 @@ bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlayi
     return didAnythingChange;
 }
 
+std::optional<std::string> nameDialog(char* str_id)
+{
+    static char name[50] = "";
+    std::optional<std::string> result = std::nullopt;
+
+    if (ImGui::BeginPopup(str_id))
+    {
+        ImGui::InputText("Name", name, 50);
+
+        if (ImGui::Button("OK"))
+        {
+            result = std::string(name);
+            name[0] = 0; // Clear name
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    return result;
+}
+
 bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 {
     if (uniformList.empty()) return false;
@@ -629,10 +651,10 @@ bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
 
     ImGui::BeginTabBar("Uniforms");
 
-    if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip))
-    {
-        groups.push_back("Group " + std::to_string(groups.size() + 1));
-    }
+    if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) ImGui::OpenPopup("Add Group Name");
+
+    auto result = nameDialog("Add Group Name");
+    if (result.has_value()) groups.push_back(result.value());
 
     static int currentlyRenamedGroup = -1;
 
