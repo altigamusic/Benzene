@@ -163,6 +163,6 @@ void CameraKeyframeController::displayImGuiWindow()
         cameraController.resetCamera();
     }
 
-    ImGui::SliderFloat("Movement Speed", &cameraController.movementScale, 1, 10);
+    ImGui::DragFloat("Movement Speed", &cameraController.movementScale, .1f, 1.0f, 400.f);
     ImGui::EndChild();
 }
