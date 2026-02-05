@@ -35,6 +35,14 @@ UNIFORM_TYPE_TO_GL_FUNCTION = {
     "vec4": "glUniform4f",
 }
 
+UNIFORM_TYPE_TO_OPENGL_TYPE = {
+    "float": "float",
+    "vec2": "vec2",
+    "vec3": "vec3",
+    "color": "vec3",
+    "vec4": "vec4",
+}
+
 
 def getCorrectedTension(tension, interpolation):
     # Interpolation 0 = linear, 1 = step, 2 = tonemap, 3 = gain
@@ -215,7 +223,7 @@ def generate_minified_shader(shader_filename, uniforms: list[Uniform], consts: l
     with open(shader_filename, "r") as f:
         shader_code = f.read()
 
-    uniform_definitions = [f"uniform {uniform.type} {uniform.name};" for uniform in uniforms]
+    uniform_definitions = [f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]} {uniform.name};" for uniform in uniforms]
     uniform_definition_code = "\n".join(uniform_definitions)
 
     const_definitions = [f"const {const.type} {const.name} = {const.value};" for const in consts]
