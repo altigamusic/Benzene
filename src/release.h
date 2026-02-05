@@ -50,6 +50,18 @@ void updateUniforms(long time);
 inline GLuint initFragmentShader(const char* fragmentShaderSource)
 {
     GLuint program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fragmentShaderSource);
+
+#ifdef DEBUG
+    int length;
+    char infoLog[500];
+    glGetProgramInfoLog(program, 500, &length, infoLog);
+
+    if (length > 0)
+    {
+        MessageBoxA(NULL, infoLog, "OpenGL Debug", MB_ICONWARNING);
+    }
+#endif
+
     GLuint pipeline;
     glGenProgramPipelines(1, &pipeline);
     glBindProgramPipeline(pipeline);
