@@ -35,6 +35,7 @@
       <Filter>Auto-Generated</Filter>
     </ClCompile>
     <ClCompile Include="src\CameraKeyframeController.cpp" />
+    <ClCompile Include="src\config.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ext.h" />
@@ -75,6 +76,9 @@
     <ClInclude Include="src\uniform_data_types.h" />
     <ClInclude Include="src\release.h" />
     <ClInclude Include="src\CameraKeyframeController.h" />
+    <ClInclude Include="src\config.h" />
+    <ClInclude Include="src\generated\release_config.h" />
+    <ClInclude Include="src\nlohmann\json.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ImGui">
