@@ -10,6 +10,7 @@ Global
 		Debug (No Generate)|x86 = Debug (No Generate)|x86
 		Debug|x86 = Debug|x86
 		Editor|x86 = Editor|x86
+		Release (No Generate)|x86 = Release (No Generate)|x86
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
@@ -19,6 +20,8 @@ Global
 		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Debug|x86.Build.0 = Debug|Win32
 		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Editor|x86.ActiveCfg = Editor|Win32
 		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Editor|x86.Build.0 = Editor|Win32
+		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Release (No Generate)|x86.ActiveCfg = Release (No Generate)|Win32
+		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Release (No Generate)|x86.Build.0 = Release (No Generate)|Win32
 		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Release|x86.ActiveCfg = Release|Win32
 		{59C1D4F3-AE93-4A0A-B4FE-60841CA865E5}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
