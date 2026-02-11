@@ -1,3 +1,4 @@
+import itertools
 import os
 import subprocess
 from dataclasses import dataclass
@@ -26,7 +27,11 @@ class Const:
     value: str
 
 
-SHOULD_INJECT_CONSTS = True  # TODO: Check if this is efficient
+# Flags that can affect crinkled size either way
+SHOULD_INJECT_CONSTS = True
+SHOULD_COMBINE_UNIFORM_DEFINITIONS = True
+
+
 UNIFORM_TYPE_TO_GL_FUNCTION = {
     "float": "glUniform1f",
     "vec2": "glUniform2f",
@@ -218,37 +223,54 @@ def generate_release_header(output_filename, bpm, length, resolution):
 #define YRES {resolution[1]}
 """)
 
+def generate_uniform_definitions(uniforms: list[Uniform]):
+    if not SHOULD_COMBINE_UNIFORM_DEFINITIONS:
+        return "\n".join([f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]} {uniform.name};" for uniform in uniforms])
+
+    # Combine all uniforms of the same type into a single definition, e.g. "uniform float u1, u2, u3;", because
+    # the shader minifier doesn't optimize this by itself
+    result = []
+
+    for uniform_type, uniforms_of_type in itertools.groupby(sorted(uniforms, key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]), key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]):
+        uniform_definitions = ",".join([uniform.name for uniform in uniforms_of_type])
+        result.append(f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform_type]} {uniform_definitions};")
+    
+    print("\n".join(result))
+    return "\n".join(result)
+
 
 def generate_minified_shader(shader_filename, uniforms: list[Uniform], consts: list[Const], output_filename, resolution=(800, 600)):
+    TEMP_SHADER_FILENAME = "__temp_shader.glsl"
+    TEMP_SHADER_VARNAME = "__temp_shader_glsl"
+
     with open(shader_filename, "r") as f:
         shader_code = f.read()
 
-    uniform_definitions = [f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]} {uniform.name};" for uniform in uniforms]
-    uniform_definition_code = "\n".join(uniform_definitions)
+    # Add _t as uniform here so it gets minified with the rest
+    uniform_definitions = generate_uniform_definitions([*uniforms, Uniform("_t", "float", [])])
 
-    const_definitions = [f"const {const.type} {const.name} = {const.value};" for const in consts]
-    const_definition_code = "\n".join(const_definitions)
+    const_definition_list = [f"const {const.type} {const.name} = {const.value};" for const in consts]
+    const_definitions = "\n".join(const_definition_list)
 
     injected_code = f"""#version 330
-uniform float _t;
-{uniform_definition_code}
-{const_definition_code}
+{uniform_definitions}
+{const_definitions}
 const vec2 _res = vec2({resolution[0]}, {resolution[1]});
 vec2 fragCoord = gl_FragCoord.xy;
 {shader_code}
 """
 
-    with open("__temp_shader.glsl", "w") as f:
+    with open(TEMP_SHADER_FILENAME, "w") as f:
         f.write(injected_code)
 
-    subprocess.call(["shader_minifier.exe", "--aggressive-inlining", "-v", "-o", output_filename, "__temp_shader.glsl"])
-    os.remove("__temp_shader.glsl")
+    subprocess.call(["shader_minifier.exe", "--aggressive-inlining", "-v", "-o", output_filename, TEMP_SHADER_FILENAME])
+    os.remove(TEMP_SHADER_FILENAME)
 
     # Replace the file name with "fragmentShaderSource" (you can't do that using the shader minifier directly)
     # Also it has to be inlined, because it's imported in two different files
     with open(output_filename, "r") as f:
         minified_code = f.read()
-    minified_code = minified_code.replace("const char *__temp_shader_glsl", "const inline char *fragmentShaderSource")
+    minified_code = minified_code.replace(f"const char *{TEMP_SHADER_VARNAME}", "const inline char *fragmentShaderSource")
     with open(output_filename, "w") as f:
         f.write(minified_code)
 
