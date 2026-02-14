@@ -13,7 +13,7 @@ struct KeyframeMovementData
 bool DragVector2(const char* label, ImVec2* v, float v_speed = 1.0f, const ImVec2* v_min = nullptr, const ImVec2* v_max = nullptr,
     const char* format = "(%.3f, %.3f)", ImGuiSliderFlags flags = 0);
 bool KeyframeSlider(const char* label, float* data, float min, float max, std::vector<float>& keyframes, KeyframeMovementData* movement);
-bool TimeSlider(const char* label, float* data, float min, float max);
+bool TimeSlider(const char* label, float* data, float min, float max, float* loopStart = nullptr, float* loopEnd = nullptr);
 bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension);
 
 bool PlayPauseButton(bool shouldDrawPauseIcon);

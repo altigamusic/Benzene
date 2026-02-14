@@ -207,10 +207,16 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
     return value_changed;
 }
 
-bool TimeSlider(const char* label, float* data, float min, float max)
+bool TimeSlider(const char* label, float* data, float min, float max, float* loopStart, float* loopEnd)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_Text);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
+    const ImU32 LOOP_MARKER_COLOR = GetColorU32(ImGuiCol_SliderGrabActive);
+    const ImU32 LOOP_MARKER_HOVER_COLOR = IM_COL32(100, 200, 255, 255);
+    const float BRACKET_WIDTH = 8.0f;
+    const float BRACKET_HEIGHT = 12.0f;
+    const float MARKER_HOVER_RADIUS = 5.0f;
+    const float SNAP_THRESHOLD = 8.0f;
 
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems) return false;
@@ -218,32 +224,135 @@ bool TimeSlider(const char* label, float* data, float min, float max)
     ImGuiContext& g = *GImGui;
     ImGuiID id = window->GetID(label);
 
+    // Static drag state: -1 = none, 0 = time slider, 1 = loop start, 2 = loop end
+    static int draggedElement = -1;
+    static ImGuiID draggedId = 0;
+
+    // Check if loop markers are available
+    bool hasLoopMarkers = (loopStart != nullptr && loopEnd != nullptr && max > min);
+
     // Calculate bounding box for the invisible button
     ImVec2 pos = window->DC.CursorPos;
     ImVec2 size = ImVec2(CalcItemWidth(), CalcTextSize("0", nullptr, true).y + g.Style.FramePadding.y * 2.0f);
     ImVec2 fullSize = ImVec2(size.x + CalcTextSize("9999999", nullptr, true).x + g.Style.ItemInnerSpacing.x, size.y);
 
     bool value_changed = false;
+    bool pressed = InvisibleButton(label, fullSize, ImGuiButtonFlags_PressedOnClick);
 
-    if (!InvisibleButton(label, fullSize) && IsItemActive())
+    // Pre-calculate loop marker positions if available
+    float viewRange = 0.0f;
+    float startX = 0.0f, endX = 0.0f;
+    ImRect startMarkerBB, endMarkerBB;
+    if (hasLoopMarkers)
     {
+        viewRange = max - min;
+        float startRatio = ImClamp((*loopStart - min) / viewRange, -0.1f, 1.1f);
+        float endRatio = ImClamp((*loopEnd - min) / viewRange, -0.1f, 1.1f);
+        startX = pos.x + startRatio * size.x;
+        endX = pos.x + endRatio * size.x;
+
+        float markerVCenter = pos.y + size.y / 2.0f;
+        startMarkerBB =
+            ImRect(startX, markerVCenter - BRACKET_HEIGHT / 2.0f, startX + BRACKET_WIDTH, markerVCenter + BRACKET_HEIGHT / 2.0f);
+        endMarkerBB = ImRect(endX - BRACKET_WIDTH, markerVCenter - BRACKET_HEIGHT / 2.0f, endX, markerVCenter + BRACKET_HEIGHT / 2.0f);
+    }
+
+    if (pressed || IsItemActive())
+    {
+        draggedId = id;
         ImVec2 relativePos = GetIO().MousePos - pos;
         float ratio = relativePos.x / size.x;
         ratio = ImClamp(ratio, 0.0f, 1.0f);
+        float mouseValue = min + ratio * (max - min);
+        float snapThresholdValue = SNAP_THRESHOLD / size.x * (max - min);
 
-        // Round to snap
-        float new_value = roundf(min + ratio * (max - min));
-
-        if (new_value != *data)
+        if (pressed)
         {
-            *data = new_value;
-            value_changed = true;
+            // Detect which element is being clicked
+            draggedElement = (hasLoopMarkers && startMarkerBB.Contains(GetIO().MousePos)) ? 1
+                             : (hasLoopMarkers && endMarkerBB.Contains(GetIO().MousePos)) ? 2
+                                                                                          : 0;
         }
+        else
+        {
+            // Drag occurred
+            // Handle dragging of the appropriate element
+            if (draggedElement == 0)
+            {
+                // Dragging time slider
+                float new_value = roundf(mouseValue);
+                if (new_value != *data)
+                {
+                    *data = new_value;
+                    value_changed = true;
+                }
+            }
+            else if (draggedElement == 1 && loopStart != nullptr && loopEnd != nullptr)
+            {
+                // Dragging loop start marker
+                float newStart = ImClamp(roundf(mouseValue), 0.0f, *loopEnd - 1.f);
+                if (newStart != *loopStart)
+                {
+                    *loopStart = newStart;
+                    value_changed = true;
+                }
+            }
+            else if (draggedElement == 2 && loopStart != nullptr && loopEnd != nullptr)
+            {
+                // Dragging loop end marker
+                float newEnd = ImClamp(roundf(mouseValue), *loopStart + 1.f, max);
+
+                if (newEnd != *loopEnd)
+                {
+                    *loopEnd = newEnd;
+                    value_changed = true;
+                }
+            }
+        }
+    }
+    else if (draggedId == id)
+    {
+        draggedElement = -1;
+        draggedId = 0;
     }
 
     // Render timeline
     ImDrawList* draw_list = GetWindowDrawList();
     draw_list->AddLine(pos + ImVec2(0, size.y * .5f), pos + ImVec2(size.x, size.y * .5f), TIMELINE_COLOR, 1.0f);
+
+    if (hasLoopMarkers)
+    {
+        // Draw loop brackets
+        if (*loopStart >= min && *loopStart <= max)
+        {
+            bool markerHovered = startMarkerBB.Contains(GetIO().MousePos);
+            bool isBeingDragged = draggedElement == 1 && draggedId == id;
+            ImU32 markerColor = isBeingDragged ? LOOP_MARKER_HOVER_COLOR : (markerHovered ? LOOP_MARKER_HOVER_COLOR : LOOP_MARKER_COLOR);
+
+            // Draw < (with point at correct time)
+            ImVec2 top = ImVec2(startX + BRACKET_WIDTH, pos.y + size.y / 2.0f - BRACKET_HEIGHT / 2.0f);
+            ImVec2 center = ImVec2(startX, pos.y + size.y / 2.0f);
+            ImVec2 bottom = ImVec2(startX + BRACKET_WIDTH, pos.y + size.y / 2.0f + BRACKET_HEIGHT / 2.0f);
+
+            draw_list->AddLine(top, center, markerColor, 2.0f);
+            draw_list->AddLine(center, bottom, markerColor, 2.0f);
+        }
+
+        if (*loopEnd >= min && *loopEnd <= max)
+        {
+            bool markerHovered = endMarkerBB.Contains(GetIO().MousePos);
+            bool isBeingDragged = draggedElement == 2 && draggedId == id;
+            ImU32 markerColor = isBeingDragged ? LOOP_MARKER_HOVER_COLOR : (markerHovered ? LOOP_MARKER_HOVER_COLOR : LOOP_MARKER_COLOR);
+
+            // Draw > (with point at correct time)
+            ImVec2 top = ImVec2(endX - BRACKET_WIDTH, pos.y + size.y / 2.0f - BRACKET_HEIGHT / 2.0f);
+            ImVec2 center = ImVec2(endX, pos.y + size.y / 2.0f);
+            ImVec2 bottom = ImVec2(endX - BRACKET_WIDTH, pos.y + size.y / 2.0f + BRACKET_HEIGHT / 2.0f);
+
+            draw_list->AddLine(top, center, markerColor, 2.0f);
+            draw_list->AddLine(center, bottom, markerColor, 2.0f);
+        }
+    }
 
     // Render current value indicator
     if (*data >= min && *data <= max)

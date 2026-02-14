@@ -41,6 +41,10 @@ bool showDemoWindow;
 int demoTimeLength = 140;
 int bpm = 120;
 
+bool isAbLooping = false;
+float loopStartTime = 0.0f;
+float loopEndTime = 140.0f;
+
 void resizeWindow(int width, int height)
 {
     windowWidth = width;
@@ -739,6 +743,7 @@ void loadConfigFromFile(const std::string& filename)
         releaseResolutionX = cfg.resolutionX;
         releaseResolutionY = cfg.resolutionY;
         demoTimeLength = cfg.lengthInBeats;
+        loopEndTime = demoTimeLength; // Update loop end time when config is loaded
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
         if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
 
@@ -799,12 +804,12 @@ std::vector<int> getAllKeyframes()
     return keyframes;
 }
 
-bool renderTimelines(float* time, float& minTime, float& maxTime)
+bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopStart = nullptr, float* loopEnd = nullptr)
 {
     bool didChange = false;
 
     ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
-    didChange |= TimeSlider("Time", time, minTime, maxTime);
+    didChange |= TimeSlider("Time", time, minTime, maxTime, loopStart, loopEnd);
 
     if (cameraController.positionUniform.keyframes.size() > 1)
     {
@@ -1053,7 +1058,13 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             long playTimeMs = currentSystemTime - playStartSystemTime;
             float playTimeBeats = msToBeats(playTimeMs, bpm);
             t = playStartTime + playTimeBeats;
-            t = fmodf(t, demoTimeLength);
+
+            if (isAbLooping && loopEndTime > loopStartTime)
+                // Note: fmodf doesn't work on negative values, so if the player is before the loop, it'll play until it.
+                // This is a feature - it's more convenient and preferable.
+                t = fmodf(t - loopStartTime, loopEndTime - loopStartTime) + loopStartTime;
+            else
+                t = fmodf(t, demoTimeLength);
         }
 
         cameraController.startFrame(t);
@@ -1111,9 +1122,17 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::SameLine();
         ImGui::SetNextItemWidth(50);
+        int prevDemoTimeLength = demoTimeLength;
         ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
 
-        if (renderTimelines(&t, timelineViewStart, timelineViewEnd))
+        // Update loop end time if demo length changed
+        if (demoTimeLength != prevDemoTimeLength && loopEndTime > demoTimeLength) loopEndTime = demoTimeLength;
+
+        ImGui::SameLine(0, 50);
+        ImGui::Checkbox("Loop Segment", &isAbLooping);
+
+        if (renderTimelines(
+                &t, timelineViewStart, timelineViewEnd, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
         {
             shouldRerender = true;
             frames = -1;
