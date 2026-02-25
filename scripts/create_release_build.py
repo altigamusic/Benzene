@@ -220,10 +220,18 @@ def generate_release_file(uniforms, output_filename, include_tension: bool):
         f.write(release_file_code)
 
 
-def generate_release_header(output_filename, bpm, length, resolution, default_interpolation_factor: float | None):
+def generate_release_header(
+    output_filename, bpm, length, resolution, default_interpolation_factor: float | None, interpolations_to_include: set[InterpolationType]
+):
     default_interpolation = (
         f"#define DEFAULT_INTERPOLATION_FACTOR {default_interpolation_factor:.6f}f\n" if default_interpolation_factor is not None else ""
     )
+
+    interpolation_includes = ""
+    if InterpolationType.TONEMAP in interpolations_to_include:
+        interpolation_includes += "#define INCLUDE_TONEMAP\n"
+    if InterpolationType.GAIN in interpolations_to_include:
+        interpolation_includes += "#define INCLUDE_GAIN\n"
 
     with open(output_filename, "w") as f:
         f.write(f"""#pragma once
@@ -233,6 +241,7 @@ def generate_release_header(output_filename, bpm, length, resolution, default_in
 #define XRES {resolution[0]}
 #define YRES {resolution[1]}
 {default_interpolation}
+{interpolation_includes}
 """)
 
 
@@ -325,6 +334,7 @@ def main():
     else:
         animated_uniforms, consts = uniforms, []
 
+    interpolations_to_include = set(keyframe.interpolation for uniform in animated_uniforms for keyframe in uniform.keyframes)
     default_interpolation_factor = get_default_interpolation_factor(animated_uniforms)
     include_tension = default_interpolation_factor is None
 
@@ -337,6 +347,7 @@ def main():
         config["lengthInBeats"],
         config["resolution"],
         default_interpolation_factor,
+        interpolations_to_include,
     )
 
     generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename, config["resolution"])

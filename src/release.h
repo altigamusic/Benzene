@@ -37,12 +37,16 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
     case 1: // Step
         t = 0;
         break;
+#ifdef INCLUDE_TONEMAP
     case 2: // Tonemap
         t = a > 0.f ? pow(t, a + 1.f) : 1.f - pow(1.f - t, 1.f - a);
         break;
+#endif
+#ifdef INCLUDE_GAIN
     case 3: // Gain
         t = (t < 0.5) ? 0.5f * pow(2.0f * t, a) : 1.0f - 0.5f * pow(2.0f * (1.0f - t), a);
         break;
+#endif
     default: // Linear
         // No action required
         break;
