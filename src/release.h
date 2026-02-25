@@ -2,6 +2,7 @@
 #include "ext.h"
 #include "generated/shader.inl"
 #include <math.h>
+#include "generated/release_config.h"
 
 #pragma function(pow)
 
@@ -10,7 +11,9 @@ struct Keyframe
     int time;
     float value;
     int interpolation;
+#ifndef DEFAULT_INTERPOLATION_FACTOR
     float interpolationFactor;
+#endif
 };
 
 inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
@@ -23,7 +26,11 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
 
     // This assumes a keyframe at 0
     float t = ((time - keyframes[i - 1].time) / (keyframes[i].time - keyframes[i - 1].time));
+#ifdef DEFAULT_INTERPOLATION_FACTOR
+    float a = DEFAULT_INTERPOLATION_FACTOR;
+#else
     float a = keyframes[i].interpolationFactor;
+#endif
 
     switch (keyframes[i].interpolation)
     {

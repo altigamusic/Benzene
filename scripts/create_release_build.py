@@ -2,7 +2,15 @@ import itertools
 import os
 import subprocess
 from dataclasses import dataclass
+from enum import IntEnum
 import json
+
+
+class InterpolationType(IntEnum):
+    LINEAR = 0
+    STEP = 1
+    TONEMAP = 2
+    GAIN = 3
 
 
 @dataclass
@@ -49,12 +57,11 @@ UNIFORM_TYPE_TO_OPENGL_TYPE = {
 }
 
 
-def getCorrectedTension(tension, interpolation):
-    # Interpolation 0 = linear, 1 = step, 2 = tonemap, 3 = gain
+def get_corrected_tension(tension, interpolation):
     # Copied from convert01ToCorrectFactor function in uniform.cpp
-    if interpolation == 2:  # Tonemap
+    if interpolation == InterpolationType.TONEMAP:
         return (tension - 0.5) * 20
-    elif interpolation == 3:  # Gain
+    elif interpolation == InterpolationType.GAIN:
         return tension * 19 + 1
     else:
         # No factor needed for linear or step
@@ -65,7 +72,7 @@ def parse_keyframe(kf: dict):
     interpolation = int(kf["interpolation"])
     value = kf["value"] if isinstance(kf["value"], list) else [kf["value"]]
 
-    return Keyframe(int(kf["time"]), value, interpolation, getCorrectedTension(kf["tension"], interpolation))
+    return Keyframe(int(kf["time"]), value, interpolation, get_corrected_tension(kf["tension"], interpolation))
 
 
 def parse_config_file(filename):
@@ -92,8 +99,9 @@ def parse_config_file(filename):
     return uniforms, config
 
 
-def keyframe_to_array_string(keyframe: Keyframe, idx: int):
-    return f"{{{keyframe.time}, {keyframe.values[idx]:.6f}f, {keyframe.interpolation}, {keyframe.tension}}}"
+def keyframe_to_array_string(keyframe: Keyframe, idx: int, include_tension: bool):
+    tension = f", {keyframe.tension}" if include_tension else ""
+    return f"{{{keyframe.time}, {keyframe.values[idx]:.6f}f, {keyframe.interpolation}{tension}}}"
 
 
 def number_of_params(uniform: Uniform):
@@ -109,13 +117,13 @@ def number_of_params(uniform: Uniform):
         raise ValueError(f"Unsupported uniform type: {uniform.type}")
 
 
-def gen_keyframe_arrays(uniforms: list[Uniform]):
+def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     arrays = []
     index = 0
 
     for uniform in uniforms:
         for i in range(number_of_params(uniform)):
-            kf_array = ", ".join(keyframe_to_array_string(kf, i) for kf in uniform.keyframes)
+            kf_array = ", ".join(keyframe_to_array_string(kf, i, include_tension) for kf in uniform.keyframes)
 
             if len(kf_array) > 0:
                 arrays.append(f"Keyframe keyframes{index}[] = {{{kf_array}}};")
@@ -154,9 +162,9 @@ def split_animated_and_const_uniforms(uniforms: list[Uniform]):
     return animated_uniforms, list(map(uniform_to_const, consts))
 
 
-def generate_release_file_code(uniforms):
+def generate_release_file_code(uniforms, include_tension: bool):
     # Generate all keyframe array declarations
-    keyframe_arrays = "\n".join(gen_keyframe_arrays(uniforms))
+    keyframe_arrays = "\n".join(gen_keyframe_arrays(uniforms, include_tension))
 
     # Generate uniform location assignments
     uniform_locations = "\n".join(
@@ -205,14 +213,18 @@ void updateUniforms(float time) {{
 """
 
 
-def generate_release_file(uniforms, output_filename):
-    release_file_code = generate_release_file_code(uniforms)
+def generate_release_file(uniforms, output_filename, include_tension: bool):
+    release_file_code = generate_release_file_code(uniforms, include_tension)
 
     with open(output_filename, "w") as f:
         f.write(release_file_code)
 
 
-def generate_release_header(output_filename, bpm, length, resolution):
+def generate_release_header(output_filename, bpm, length, resolution, default_interpolation_factor: float | None):
+    default_interpolation = (
+        f"#define DEFAULT_INTERPOLATION_FACTOR {default_interpolation_factor:.6f}f\n" if default_interpolation_factor is not None else ""
+    )
+
     with open(output_filename, "w") as f:
         f.write(f"""#pragma once
 
@@ -220,7 +232,28 @@ def generate_release_header(output_filename, bpm, length, resolution):
 #define DEMO_LENGTH {length:.2f}f
 #define XRES {resolution[0]}
 #define YRES {resolution[1]}
+{default_interpolation}
 """)
+
+
+def get_default_interpolation_factor(uniforms: list[Uniform]) -> float | None:
+    keyframes_that_require_tension = [
+        keyframe
+        for uniform in uniforms
+        for keyframe in uniform.keyframes
+        if keyframe.interpolation in (InterpolationType.TONEMAP, InterpolationType.GAIN)
+    ]
+
+    if len(keyframes_that_require_tension) == 0:
+        return 0.0
+
+    default_tension = keyframes_that_require_tension[0].tension
+
+    # If all keyframes that require tension have the same tension, we can return it and save storage
+    if all(abs(kf.tension - default_tension) < 1e-6 for kf in keyframes_that_require_tension):
+        return default_tension
+
+    return None
 
 
 def generate_uniform_definitions(uniforms: list[Uniform]):
@@ -292,10 +325,19 @@ def main():
     else:
         animated_uniforms, consts = uniforms, []
 
-    generate_release_file(animated_uniforms, output_filename)
+    default_interpolation_factor = get_default_interpolation_factor(animated_uniforms)
+    include_tension = default_interpolation_factor is None
+
+    generate_release_file(animated_uniforms, output_filename, include_tension)
     print(f"Generated {output_filename}")
 
-    generate_release_header(output_header_filename, config["bpm"], config["lengthInBeats"], config["resolution"])
+    generate_release_header(
+        output_header_filename,
+        config["bpm"],
+        config["lengthInBeats"],
+        config["resolution"],
+        default_interpolation_factor,
+    )
 
     generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename, config["resolution"])
     print(f"Generated {shader_output_filename}")
