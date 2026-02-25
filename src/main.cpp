@@ -109,7 +109,7 @@ std::vector<std::string> getUndeclaredIdentifiers(std::string error)
             // Only one group will match something and the other(s) will be empty
             for (size_t i = 1; i < match.size(); ++i)
             {
-                if (match[i].matched)
+                if (match[i].matched && std::find(result.begin(), result.end(), match[i].str()) == result.end())
                 {
                     result.push_back(match[i].str());
                     break;
