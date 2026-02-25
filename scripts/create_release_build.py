@@ -73,8 +73,7 @@ def parse_config_file(filename):
         config = json.load(f)
 
     uniforms = [
-        Uniform(uniform["name"], uniform["type"], [parse_keyframe(kf) for kf in uniform["keyframes"]])
-        for uniform in config["uniforms"]
+        Uniform(uniform["name"], uniform["type"], [parse_keyframe(kf) for kf in uniform["keyframes"]]) for uniform in config["uniforms"]
     ]
 
     # Guarantee keyframe at 0
@@ -83,8 +82,9 @@ def parse_config_file(filename):
         if uniform.keyframes[0].time > 0:
             if len(uniform.keyframes) > 1:
                 # Copy the first keyframe to time 0
-                uniform.keyframes.insert(0, Keyframe(
-                    0, uniform.keyframes[0].values, uniform.keyframes[0].interpolation, uniform.keyframes[0].tension))
+                uniform.keyframes.insert(
+                    0, Keyframe(0, uniform.keyframes[0].values, uniform.keyframes[0].interpolation, uniform.keyframes[0].tension)
+                )
             else:
                 # This uniform is a const so moving the keyframe to 0 will have no effect
                 uniform.keyframes[0].time = 0
@@ -176,8 +176,7 @@ def generate_release_file_code(uniforms):
         if number_of_keyframes == 0:
             params = ["0.0f"] * number_of_params(uniform)
         else:
-            params = [
-                f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
+            params = [f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
         param_string = ",".join(params)
         kf_index += len(params)
 
@@ -223,6 +222,7 @@ def generate_release_header(output_filename, bpm, length, resolution):
 #define YRES {resolution[1]}
 """)
 
+
 def generate_uniform_definitions(uniforms: list[Uniform]):
     if not SHOULD_COMBINE_UNIFORM_DEFINITIONS:
         return "\n".join([f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]} {uniform.name};" for uniform in uniforms])
@@ -231,10 +231,12 @@ def generate_uniform_definitions(uniforms: list[Uniform]):
     # the shader minifier doesn't optimize this by itself
     result = []
 
-    for uniform_type, uniforms_of_type in itertools.groupby(sorted(uniforms, key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]), key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]):
+    for uniform_type, uniforms_of_type in itertools.groupby(
+        sorted(uniforms, key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]), key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]
+    ):
         uniform_definitions = ",".join([uniform.name for uniform in uniforms_of_type])
         result.append(f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform_type]} {uniform_definitions};")
-    
+
     print("\n".join(result))
     return "\n".join(result)
 
@@ -295,8 +297,7 @@ def main():
 
     generate_release_header(output_header_filename, config["bpm"], config["lengthInBeats"], config["resolution"])
 
-    generate_minified_shader(shader_source_filename, animated_uniforms, consts,
-                             shader_output_filename, config["resolution"])
+    generate_minified_shader(shader_source_filename, animated_uniforms, consts, shader_output_filename, config["resolution"])
     print(f"Generated {shader_output_filename}")
 
 
