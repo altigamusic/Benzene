@@ -9,8 +9,8 @@ CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", Un
 
 void CameraKeyframeController::moveCameraToKeyframe()
 {
-    UniformValue position = positionUniform.valueAtTime(currentTime);
-    UniformValue rotation = rotationUniform.valueAtTime(currentTime);
+    UniformValue position = positionUniform.valueAtTime(currentTime, 6);
+    UniformValue rotation = rotationUniform.valueAtTime(currentTime, 6);
     cameraController.position = {position.v3[0], position.v3[1], position.v3[2]};
     cameraController.xAngle = rotation.v2[0];
     cameraController.yAngle = rotation.v2[1];

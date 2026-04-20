@@ -63,7 +63,48 @@ float gain(float x, float factor)
     return (x < 0.5) ? a : 1.0 - a;
 }
 
-float tonemap(float x, float factor) { return factor > 0.f ? pow(x, factor + 1.f) : 1.f - pow(1.f - x   , 1.f - factor); }
+float tonemap(float x, float factor) { return factor > 0.f ? pow(x, factor + 1.f) : 1.f - pow(1.f - x, 1.f - factor); }
+
+static float quantizeFloat(float value, int digits)
+{
+    if (digits == -1) return value; // Skip quantization on -1
+    if (digits == 0) return roundf(value);
+
+    float scale = powf(10.0f, static_cast<float>(digits));
+    return roundf(value * scale) / scale;
+}
+
+static UniformValue quantizeValue(UniformValue value, UniformType type, int digits)
+{
+    UniformValue result = value;
+
+    switch (type)
+    {
+    case UniformType::Float:
+        result.f = quantizeFloat(value.f, digits);
+        break;
+    case UniformType::Vec2:
+        result.v2[0] = quantizeFloat(value.v2[0], digits);
+        result.v2[1] = quantizeFloat(value.v2[1], digits);
+        break;
+    case UniformType::Vec3:
+    case UniformType::Color:
+        result.v3[0] = quantizeFloat(value.v3[0], digits);
+        result.v3[1] = quantizeFloat(value.v3[1], digits);
+        result.v3[2] = quantizeFloat(value.v3[2], digits);
+        break;
+    case UniformType::Vec4:
+        result.v4[0] = quantizeFloat(value.v4[0], digits);
+        result.v4[1] = quantizeFloat(value.v4[1], digits);
+        result.v4[2] = quantizeFloat(value.v4[2], digits);
+        result.v4[3] = quantizeFloat(value.v4[3], digits);
+        break;
+    default:
+        break;
+    }
+
+    return result;
+}
 
 Uniform::Uniform(const std::string& name, UniformType type) : name(name), type(type), location((GLuint)-1) {}
 
@@ -87,9 +128,12 @@ float interpolate0to1(float x, KeyframeInterpolation interpolation, float interp
 }
 
 float interpolateTime(float time, float startTime, float endTime, float prevValue, float nextValue, KeyframeInterpolation interpolation,
-    float interpolationFactor)
+    float interpolationFactor, int digits)
 {
     if (endTime <= startTime) return 0.0f;
+
+    prevValue = quantizeFloat(prevValue, digits);
+    nextValue = quantizeFloat(nextValue, digits);
 
     // Find the interpolation ratio between 0-1, then linearly interpolate the actual values
     float x = (time - startTime) / (endTime - startTime);
@@ -97,17 +141,25 @@ float interpolateTime(float time, float startTime, float endTime, float prevValu
     return lerp(prevValue, nextValue, ratio);
 }
 
-UniformValue Uniform::valueAtTime(float time)
+/// <summary>
+/// Get the uniform value at the given time, based on its keyframes.
+/// </summary>
+/// <param name="time">The time to get the value at.</param>
+/// <param name="defaultQuantizationDigits">The default number of digits to round the keyframes to. If this value is -1, no rounding is
+/// performed.</param> <returns></returns>
+UniformValue Uniform::valueAtTime(float time, int defaultQuantizationDigits)
 {
     if (keyframes.empty()) return getDefault(type);
+
+    int digits = defaultQuantizationDigits == -1 ? -1 : this->quantization.value_or(defaultQuantizationDigits);
 
     auto previousKeyframe =
         std::find_if(keyframes.rbegin(), keyframes.rend(), [time](const UniformKeyframe& kf) { return kf.time <= time; });
 
     if (previousKeyframe == keyframes.rend())
-        return keyframes.begin()->value;
+        return quantizeValue(keyframes.begin()->value, type, digits);
     else if (previousKeyframe == keyframes.rbegin())
-        return previousKeyframe->value;
+        return quantizeValue(previousKeyframe->value, type, digits);
 
     auto nextKeyframe = previousKeyframe.base();
 
@@ -116,34 +168,34 @@ UniformValue Uniform::valueAtTime(float time)
     if (type == UniformType::Float)
     {
         result.f = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.f, nextKeyframe->value.f,
-            nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
     }
     else if (type == UniformType::Vec2)
     {
         result.v2[0] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v2[0],
-            nextKeyframe->value.v2[0], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v2[0], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
         result.v2[1] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v2[1],
-            nextKeyframe->value.v2[1], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v2[1], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
     }
     else if (type == UniformType::Vec3 || type == UniformType::Color)
     {
         result.v3[0] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v3[0],
-            nextKeyframe->value.v3[0], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v3[0], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
         result.v3[1] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v3[1],
-            nextKeyframe->value.v3[1], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v3[1], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
         result.v3[2] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v3[2],
-            nextKeyframe->value.v3[2], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v3[2], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
     }
     else if (type == UniformType::Vec4)
     {
         result.v4[0] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v4[0],
-            nextKeyframe->value.v4[0], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v4[0], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
         result.v4[1] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v4[1],
-            nextKeyframe->value.v4[1], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v4[1], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
         result.v4[2] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v4[2],
-            nextKeyframe->value.v4[2], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v4[2], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
         result.v4[3] = interpolateTime(time, previousKeyframe->time, nextKeyframe->time, previousKeyframe->value.v4[3],
-            nextKeyframe->value.v4[3], nextKeyframe->interpolation, nextKeyframe->interpolationFactor);
+            nextKeyframe->value.v4[3], nextKeyframe->interpolation, nextKeyframe->interpolationFactor, digits);
     }
 
     return result;

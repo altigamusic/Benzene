@@ -136,11 +136,19 @@ UniformConfig loadConfig(const std::string& filename)
     config.lengthInBeats = configJson["lengthInBeats"];
     config.resolutionX = configJson["resolution"][0];
     config.resolutionY = configJson["resolution"][1];
+    if (configJson.contains("shaderQuantizationDigits") && configJson["shaderQuantizationDigits"].is_number())
+    {
+        config.shaderQuantizationDigits = configJson["shaderQuantizationDigits"].get<int>();
+    }
 
     for (auto& uniformJson : configJson["uniforms"])
     {
         Uniform newUniform(uniformJson["name"], getUniformTypeFromString(uniformJson["type"]));
         newUniform.group = uniformJson.value("group", "");
+        if (uniformJson.contains("quantization") && uniformJson["quantization"].is_number())
+        {
+            newUniform.quantization = uniformJson["quantization"].get<int>();
+        }
 
         for (auto& keyframeJson : uniformJson["keyframes"])
         {
@@ -190,6 +198,10 @@ json uniformToJson(const Uniform& uniform)
         {"keyframes", keyframesJson                    },
     };
     if (!uniform.group.empty()) uniformJson["group"] = uniform.group;
+    if (uniform.quantization.has_value())
+    {
+        uniformJson["quantization"] = uniform.quantization.value();
+    }
 
     return uniformJson;
 }
@@ -214,11 +226,12 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
     if (config.cameraRotation.has_value()) uniformListJson.push_back(uniformToJson(config.cameraRotation.value()));
 
     json configJson = {
-        {"uniforms",      uniformListJson                                       },
-        {"bpm",           config.bpm                                            },
-        {"lengthInBeats", config.lengthInBeats                                  },
-        {"resolution",    json ::array({config.resolutionX, config.resolutionY})},
-        {"version",       CURRENT_VERSION                                       },
+        {"uniforms",                 uniformListJson                                       },
+        {"bpm",                      config.bpm                                            },
+        {"lengthInBeats",            config.lengthInBeats                                  },
+        {"resolution",               json ::array({config.resolutionX, config.resolutionY})},
+        {"shaderQuantizationDigits", config.shaderQuantizationDigits                       },
+        {"version",                  CURRENT_VERSION                                       },
     };
 
     file << std::setw(2) << configJson;

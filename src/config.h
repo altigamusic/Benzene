@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <optional>
+#include <string>
 #include "uniform.h"
 
 struct UniformConfig
@@ -10,6 +11,7 @@ struct UniformConfig
     float lengthInBeats;
     int resolutionX;
     int resolutionY;
+    int shaderQuantizationDigits = 6;
     std::vector<Uniform> uniformList;
     std::optional<Uniform> cameraPosition;
     std::optional<Uniform> cameraRotation;

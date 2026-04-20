@@ -3,6 +3,7 @@
 #include "gl/GL.h"
 #include <string>
 #include <vector>
+#include <optional>
 #include "uniform_data_types.h"
 
 struct UniformKeyframe
@@ -25,8 +26,9 @@ class Uniform
     GLuint location;
     std::vector<UniformKeyframe> keyframes;
     std::string group;
+    std::optional<int> quantization;
 
-    UniformValue valueAtTime(float time);
+    UniformValue valueAtTime(float time, int defaultQuantizationDigits = -1);
     void setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation = KeyframeInterpolation::Linear,
         float interpolationFactor = 0.0f);
     UniformKeyframe* getKeyframeAtTime(float time);

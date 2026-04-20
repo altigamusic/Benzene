@@ -26,6 +26,7 @@ class Uniform:
     name: str
     type: str
     keyframes: list[Keyframe]
+    quantization: int | None
 
 
 @dataclass
@@ -80,7 +81,8 @@ def parse_config_file(filename):
         config = json.load(f)
 
     uniforms = [
-        Uniform(uniform["name"], uniform["type"], [parse_keyframe(kf) for kf in uniform["keyframes"]]) for uniform in config["uniforms"]
+        Uniform(uniform["name"], uniform["type"], [parse_keyframe(kf) for kf in uniform["keyframes"]], uniform.get("quantization"))
+        for uniform in config["uniforms"]
     ]
 
     # Guarantee keyframe at 0
@@ -133,33 +135,58 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     return arrays
 
 
-def keyframe_values_to_const_value(type: str, values: list[float]):
+def clamp_quantization_digits(digits) -> int:
+    try:
+        return max(0, int(digits))
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_shader_quantization_default(config: dict) -> int:
+    return clamp_quantization_digits(config.get("shaderQuantizationDigits", 8))
+
+
+def format_float_for_glsl(value: float, digits: int) -> str:
+    if digits <= 0:
+        return f"{int(round(value))}.0"
+    return f"{round(value, digits):.{digits}f}"
+
+
+def keyframe_values_to_const_value(type: str, values: list[float], digits: int):
     if type == "float":
-        return f"{values[0]:.6f}"
+        return format_float_for_glsl(values[0], digits)
     elif type == "vec2":
-        return f"vec2({values[0]:.6f},{values[1]:.6f})"
+        return f"vec2({format_float_for_glsl(values[0], digits)},{format_float_for_glsl(values[1], digits)})"
     elif type in ("vec3", "color"):
-        return f"vec3({values[0]:.6f}, {values[1]:.6f}, {values[2]:.6f})"
+        return (
+            f"vec3({format_float_for_glsl(values[0], digits)}, {format_float_for_glsl(values[1], digits)},"
+            f" {format_float_for_glsl(values[2], digits)})"
+        )
     elif type == "vec4":
-        return f"vec4({values[0]:.6f}, {values[1]:.6f}, {values[2]:.6f}, {values[3]:.6f})"
+        return (
+            f"vec4({format_float_for_glsl(values[0], digits)}, {format_float_for_glsl(values[1], digits)},"
+            f" {format_float_for_glsl(values[2], digits)}, {format_float_for_glsl(values[3], digits)})"
+        )
     else:
         return "0.0"
 
 
-def uniform_to_const(uniform: Uniform):
+def uniform_to_const(uniform: Uniform, quantization_default_digits: int):
     try:
         keyframe_values = uniform.keyframes[0].values
     except IndexError:
         keyframe_values = [0] * number_of_params(uniform)
 
-    return Const(uniform.name, uniform.type, keyframe_values_to_const_value(uniform.type, keyframe_values))
+    digits = uniform.quantization if uniform.quantization is not None else quantization_default_digits
+    digits = clamp_quantization_digits(digits)
+    return Const(uniform.name, uniform.type, keyframe_values_to_const_value(uniform.type, keyframe_values, digits))
 
 
-def split_animated_and_const_uniforms(uniforms: list[Uniform]):
+def split_animated_and_const_uniforms(uniforms: list[Uniform], quantization_default_digits: int):
     animated_uniforms = [uniform for uniform in uniforms if len(uniform.keyframes) > 1]
     consts = [uniform for uniform in uniforms if len(uniform.keyframes) <= 1]
 
-    return animated_uniforms, list(map(uniform_to_const, consts))
+    return animated_uniforms, [uniform_to_const(uniform, quantization_default_digits) for uniform in consts]
 
 
 def generate_release_file_code(uniforms, include_tension: bool):
@@ -291,7 +318,7 @@ def generate_minified_shader(shader_filename, uniforms: list[Uniform], consts: l
         shader_code = f.read()
 
     # Add _t as uniform here so it gets minified with the rest
-    uniform_definitions = generate_uniform_definitions([*uniforms, Uniform("_t", "float", [])])
+    uniform_definitions = generate_uniform_definitions([*uniforms, Uniform("_t", "float", [], None)])
 
     const_definition_list = [f"const {const.type} {const.name} = {const.value};" for const in consts]
     const_definitions = "\n".join(const_definition_list)
@@ -328,9 +355,10 @@ def main():
     shader_output_filename = "src/generated/shader.inl"
 
     uniforms, config = parse_config_file(config_filename)
+    quantization_default_digits = get_shader_quantization_default(config)
 
     if SHOULD_INJECT_CONSTS:
-        animated_uniforms, consts = split_animated_and_const_uniforms(uniforms)
+        animated_uniforms, consts = split_animated_and_const_uniforms(uniforms, quantization_default_digits)
     else:
         animated_uniforms, consts = uniforms, []
 

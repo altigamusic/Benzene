@@ -35,6 +35,7 @@ const char* configFileName = "config.json";
 
 int releaseResolutionX;
 int releaseResolutionY;
+int shaderQuantizationDigits = 6;
 
 bool showDemoWindow;
 
@@ -265,7 +266,7 @@ void updateUniforms(const float ftime)
 
     for (Uniform& uniform : uniformList)
     {
-        auto value = uniform.valueAtTime(ftime);
+        auto value = uniform.valueAtTime(ftime, shaderQuantizationDigits);
 
         switch (uniform.type)
         {
@@ -554,6 +555,19 @@ bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlayi
                 didAnythingChange = true;
             }
 
+            int quantizationIndex = uniform.quantization.has_value() ? uniform.quantization.value() + 1 : 0;
+            const char* quantizationItems[] = {"Default", "0", "1", "2", "3", "4", "5", "6"};
+
+            if (ImGui::Combo("Quantization", &quantizationIndex, quantizationItems, 8))
+            {
+                if (quantizationIndex == 0)
+                    uniform.quantization.reset();
+                else
+                    uniform.quantization = quantizationIndex - 1;
+
+                didAnythingChange = true;
+            }
+
             if (ImGui::Selectable("Delete"))
             {
                 uniformToDelete = uniformIt;
@@ -742,6 +756,7 @@ void loadConfigFromFile(const std::string& filename)
         bpm = cfg.bpm;
         releaseResolutionX = cfg.resolutionX;
         releaseResolutionY = cfg.resolutionY;
+        shaderQuantizationDigits = cfg.shaderQuantizationDigits;
         demoTimeLength = cfg.lengthInBeats;
         loopEndTime = demoTimeLength; // Update loop end time when config is loaded
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
@@ -765,8 +780,8 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
-        UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, uniformList,
-            cameraController.positionUniform, cameraController.rotationUniform};
+        UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, shaderQuantizationDigits,
+            uniformList, cameraController.positionUniform, cameraController.rotationUniform};
         saveConfig(config, filename);
     }
     catch (const std::exception& e)
@@ -965,6 +980,16 @@ void renderSettingsWindow()
     didResolutionChange |= ImGui::InputInt("##yres", &releaseResolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
     if (didResolutionChange) resizeWindow(windowWidth, windowHeight);
+
+    ImGui::SeparatorText("Shader Quantization");
+
+    ImGui::Text("Default digits:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(60);
+    if (ImGui::InputInt("##shaderQuantDefault", &shaderQuantizationDigits, 1, 0, ImGuiInputTextFlags_EnterReturnsTrue))
+    {
+        if (shaderQuantizationDigits < 0) shaderQuantizationDigits = 0;
+    }
 
     ImGui::End();
 }
