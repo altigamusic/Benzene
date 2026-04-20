@@ -15,6 +15,7 @@ struct UniformConfig
     std::vector<Uniform> uniformList;
     std::optional<Uniform> cameraPosition;
     std::optional<Uniform> cameraRotation;
+    std::optional<std::string> musicWavFile;
 };
 
 bool saveConfig(const UniformConfig& config, const std::string& filename);

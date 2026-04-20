@@ -140,6 +140,10 @@ UniformConfig loadConfig(const std::string& filename)
     {
         config.shaderQuantizationDigits = configJson["shaderQuantizationDigits"].get<int>();
     }
+    if (configJson.contains("musicWavFile") && configJson["musicWavFile"].is_string())
+    {
+        config.musicWavFile = configJson["musicWavFile"].get<std::string>();
+    }
 
     for (auto& uniformJson : configJson["uniforms"])
     {
@@ -238,6 +242,11 @@ bool saveConfig(const UniformConfig& config, const std::string& filename)
         {"shaderQuantizationDigits", config.shaderQuantizationDigits                       },
         {"version",                  CURRENT_VERSION                                       },
     };
+
+    if (config.musicWavFile.has_value() && !config.musicWavFile->empty())
+    {
+        configJson["musicWavFile"] = config.musicWavFile.value();
+    }
 
     file << std::setw(2) << configJson;
 

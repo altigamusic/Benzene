@@ -41,6 +41,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug (No Generate)|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="src\editor_music.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug (No Generate)|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release (No Generate)|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="src\ext.cpp" />
     <ClCompile Include="src\generated\release.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Editor|Win32'">true</ExcludedFromBuild>
@@ -137,6 +143,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release (No Generate)|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug (No Generate)|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="src\editor_music.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug (No Generate)|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release (No Generate)|Win32'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="src\ext.h" />
     <ClInclude Include="src\generated\release_config.h">

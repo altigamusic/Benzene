@@ -16,6 +16,7 @@
 #include <windows.h>
 #include "CameraController.h"
 #include "CameraKeyframeController.h"
+#include "editor_music.h"
 #include "uniform.h"
 #include <regex>
 #include <set>
@@ -46,6 +47,7 @@ int bpm = 120;
 bool isAbLooping = false;
 float loopStartTime = 0.0f;
 float loopEndTime = 140.0f;
+bool shouldPlayMusic = true;
 
 void resizeWindow(int width, int height)
 {
@@ -773,6 +775,10 @@ void loadConfigFromFile(const std::string& filename)
         loopEndTime = demoTimeLength; // Update loop end time when config is loaded
         if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
         if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
+        if (cfg.musicWavFile.has_value() && !cfg.musicWavFile->empty())
+        {
+            EditorMusic::LoadWavFile(cfg.musicWavFile->c_str());
+        }
 
         // Load groups
         std::set<std::string> groupSet;
@@ -792,8 +798,12 @@ void saveConfigToFile(const std::string& filename)
 {
     try
     {
+        const char* loadedMusicPath = EditorMusic::GetLoadedFilePath();
+        std::optional<std::string> musicPath =
+            (loadedMusicPath != nullptr && loadedMusicPath[0] != '\0') ? std::optional<std::string>(loadedMusicPath) : std::nullopt;
+
         UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, shaderQuantizationDigits,
-            uniformList, cameraController.positionUniform, cameraController.rotationUniform};
+            uniformList, cameraController.positionUniform, cameraController.rotationUniform, musicPath};
         saveConfig(config, filename);
     }
     catch (const std::exception& e)
@@ -1223,6 +1233,13 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::SameLine(0, 50);
         ImGui::Checkbox("Loop Segment", &isAbLooping);
+        ImGui::SameLine();
+        ImGui::Checkbox("Play Music", &shouldPlayMusic);
+        ImGui::SameLine();
+        if (ImGui::Button("Open..."))
+        {
+            EditorMusic::OpenFileDialogAndLoad(info->hWnd);
+        }
 
         if (renderTimelines(
                 &t, timelineViewStart, timelineViewEnd, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
@@ -1267,6 +1284,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         // Try reloading the file
         // TODO: Maybe change the way this is done or something
         shouldRerender |= reloadFragmentShaderFromFile();
+
+        EditorMusic::Update(isPlaying && shouldPlayMusic, t, static_cast<float>(bpm));
 
         // If the render stopped just now, render to the back buffer
         if (prevShouldRerender && !shouldRerender)
@@ -1329,6 +1348,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
+    EditorMusic::Shutdown();
     sndPlaySound(0, 0);
     window_end(info);
 
