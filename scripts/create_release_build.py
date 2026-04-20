@@ -140,7 +140,7 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     return "\n".join(arrays)
 
 
-def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension: bool):
+def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension: bool, is_time_byte: bool):
     if not uniforms:
         return ""
 
@@ -198,7 +198,7 @@ def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension
 
     return f"""
 struct ByteKeyframe {{
-    int time;
+    {"unsigned char" if is_time_byte else "int"} time;
     unsigned char interpolation;
     {"" if include_tension else "//"} float tension;
     char values[{number_of_values}];
@@ -336,7 +336,7 @@ def split_animated_and_const_uniforms(uniforms: list[Uniform], quantization_defa
     return animated_uniforms, consts
 
 
-def generate_release_file_code(uniforms: list[Uniform], include_tension: bool, save_camera_as_bytes: bool):
+def generate_release_file_code(uniforms: list[Uniform], length: int, include_tension: bool, save_camera_as_bytes: bool):
     camera_uniforms = None
 
     if save_camera_as_bytes:
@@ -371,7 +371,7 @@ def generate_release_file_code(uniforms: list[Uniform], include_tension: bool, s
     uniform_value_count = value_index + camera_uniform_value_count
     uniform_updates = "\n".join(value_assignments)
 
-    byte_keyframes = generate_byte_keyframe_array(camera_uniforms, include_tension)
+    byte_keyframes = generate_byte_keyframe_array(camera_uniforms, include_tension, length <= 255)
     byte_keyframe_updates = generate_byte_keyframe_updates(camera_uniforms, value_index, include_tension)
 
     return f"""#include "../release.h"
@@ -394,8 +394,8 @@ void updateUniforms(float time) {{
 """
 
 
-def generate_release_file(uniforms, output_filename, include_tension: bool, save_camera_as_bytes: bool):
-    release_file_code = generate_release_file_code(uniforms, include_tension, save_camera_as_bytes)
+def generate_release_file(uniforms, output_filename, length: int, include_tension: bool, save_camera_as_bytes: bool):
+    release_file_code = generate_release_file_code(uniforms, length, include_tension, save_camera_as_bytes)
 
     with open(output_filename, "w") as f:
         f.write(release_file_code)
@@ -505,6 +505,7 @@ def main():
     uniforms, config = parse_config_file(config_filename)
     quantization_default_digits = get_shader_quantization_default(config)
     save_camera_as_bytes = config.get("saveCameraAsBytes", False)
+    length = config["lengthInBeats"]
 
     if SHOULD_INJECT_CONSTS:
         animated_uniforms, consts = split_animated_and_const_uniforms(uniforms, quantization_default_digits)
@@ -515,13 +516,13 @@ def main():
     default_interpolation_factor = get_default_interpolation_factor(animated_uniforms)
     include_tension = default_interpolation_factor is None
 
-    generate_release_file(animated_uniforms, output_filename, include_tension, save_camera_as_bytes)
+    generate_release_file(animated_uniforms, output_filename, length, include_tension, save_camera_as_bytes)
     print(f"Generated {output_filename}")
 
     generate_release_header(
         output_header_filename,
         config["bpm"],
-        config["lengthInBeats"],
+        length,
         config["resolution"],
         default_interpolation_factor,
         interpolations_to_include,
