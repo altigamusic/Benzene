@@ -10,7 +10,7 @@ struct Keyframe
 {
     int time;
     float value;
-    int interpolation;
+    unsigned char interpolation;
 #ifndef DEFAULT_INTERPOLATION_FACTOR
     float interpolationFactor;
 #endif
