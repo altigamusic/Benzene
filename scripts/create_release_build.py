@@ -144,6 +144,7 @@ def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension
         return ""
 
     number_of_values = sum(number_of_params(uniform) for uniform in uniforms)
+    number_of_keyframes = len(uniforms[0].keyframes)
 
     zipped_keyframes: list[list[Keyframe]] = zip(*(uniform.keyframes for uniform in uniforms), strict=True)
 
@@ -172,17 +173,17 @@ def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension
     normalized_values = [[] for _ in range(number_of_values)]
     factors = [1.0] * number_of_values
 
-    for uniform_index, uniform_values in enumerate(all_values):
+    for uniform_index, keyframe_values in enumerate(all_values):
         max_value = max_values[uniform_index]
 
         if max_value <= 1e-6:
             # Set everything to 1s
             factors[uniform_index] = max_value
-            normalized_values[uniform_index] = [1.0] * len(uniform_values)
+            normalized_values[uniform_index] = [1.0] * len(keyframe_values)
             continue
 
         factors[uniform_index] = 127 / max_value
-        normalized_values[uniform_index] = [round(v * factors[uniform_index]) for v in uniform_values]
+        normalized_values[uniform_index] = [round(v * factors[uniform_index]) for v in keyframe_values]
 
     array_rows = []
     for i, keyframe_values in enumerate(zip(*normalized_values, strict=True)):
@@ -207,6 +208,7 @@ ByteKeyframe byteKeyframes[] = {{
 }};
 
 float divisionFactors[{number_of_values}] = {{{", ".join(f"{factor:f}f" for factor in factors)}}};
+Keyframe tempArray[{number_of_keyframes}] = {{}};
 """
 
 
@@ -223,8 +225,6 @@ def generate_byte_keyframe_updates(uniforms: list[Uniform] | None, offset: int, 
         declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / divisionFactors[k], byteKeyframes[i].interpolation}"
 
     return f"""
-    Keyframe tempArray[{number_of_keyframes}] = {{}};
-
     for (int k = 0; k < {number_of_values}; k++)
     {{
         for (int i = 0; i < {number_of_keyframes}; i++)
