@@ -1,4 +1,3 @@
-import itertools
 import os
 import subprocess
 from dataclasses import dataclass
@@ -41,14 +40,6 @@ class Const:
 SHOULD_INJECT_CONSTS = True
 SHOULD_COMBINE_UNIFORM_DEFINITIONS = True
 
-
-UNIFORM_TYPE_TO_GL_FUNCTION = {
-    "float": "glUniform1f",
-    "vec2": "glUniform2f",
-    "vec3": "glUniform3f",
-    "color": "glUniform3f",
-    "vec4": "glUniform4f",
-}
 
 UNIFORM_TYPE_TO_OPENGL_TYPE = {
     "float": "float",
@@ -147,6 +138,18 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     return arrays
 
 
+def total_uniform_value_count(uniforms: list[Uniform]):
+    return sum(number_of_params(uniform) for uniform in uniforms)
+
+
+def glsl_uniform_value_expression(uniform: Uniform, start_index: int):
+    if uniform.type == "float":
+        return f"_values[{start_index}]"
+
+    values = ", ".join(f"_values[{start_index + i}]" for i in range(number_of_params(uniform)))
+    return f"{UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]}({values})"
+
+
 def clamp_quantization_digits(digits) -> int:
     try:
         return max(0, int(digits))
@@ -235,49 +238,41 @@ def generate_release_file_code(uniforms, include_tension: bool):
     # Generate all keyframe array declarations
     keyframe_arrays = "\n".join(gen_keyframe_arrays(uniforms, include_tension))
 
-    # Generate uniform location assignments
-    uniform_locations = "\n".join(
-        f"    UNIFORMS[{i}] = glGetUniformLocation(program, VAR_{uniform.name});" for i, uniform in enumerate(uniforms)
-    )
-
     kf_index = 0
-    updates = []
+    value_index = 1
+    value_assignments = ["    values[0] = time;"]
 
-    for i, uniform in enumerate(uniforms):
-        gl_func = UNIFORM_TYPE_TO_GL_FUNCTION.get(uniform.type)
-
-        if not gl_func:
-            raise ValueError(f"Unsupported uniform type: {uniform.type}")
-
+    for uniform in uniforms:
         number_of_keyframes = len(uniform.keyframes)
-        if number_of_keyframes == 0:
-            params = ["0.0f"] * number_of_params(uniform)
-        else:
-            params = [f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})" for j in range(number_of_params(uniform))]
-        param_string = ",".join(params)
-        kf_index += len(params)
+        param_count = number_of_params(uniform)
 
-        updates.append(f"    {gl_func}(UNIFORMS[{i}], {param_string});")
+        for j in range(param_count):
+            if number_of_keyframes == 0:
+                value = "0.0f"
+            else:
+                value = f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})"
+            value_assignments.append(f"    values[{value_index}] = {value};")
+            value_index += 1
 
-        uniform_definition_line = f"GLuint UNIFORMS[{len(uniforms)}] = {{0}};"
+        kf_index += param_count
 
-    uniform_updates = "\n".join(updates)
+    uniform_value_count = value_index
+    uniform_updates = "\n".join(value_assignments)
 
     return f"""#include "../release.h"
 
-{uniform_definition_line if len(uniforms) > 0 else ""}
-GLuint timeUniformLocation = 0;
+GLuint valuesUniformLocation = 0;
+float values[{uniform_value_count}] = {{0}};
 
 {keyframe_arrays}
 
 void locateUniforms(GLuint program) {{
-    timeUniformLocation = glGetUniformLocation(program, VAR__t);
-{uniform_locations}
+    valuesUniformLocation = glGetUniformLocation(program, VAR__values);
 }}
 
 void updateUniforms(float time) {{
-    glUniform1f(timeUniformLocation, time);
 {uniform_updates}
+    glUniform1fv(valuesUniformLocation, {uniform_value_count}, values);
 }}
 """
 
@@ -335,20 +330,14 @@ def get_default_interpolation_factor(uniforms: list[Uniform]) -> float | None:
 
 
 def generate_uniform_definitions(uniforms: list[Uniform]):
-    if not SHOULD_COMBINE_UNIFORM_DEFINITIONS:
-        return "\n".join([f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]} {uniform.name};" for uniform in uniforms])
+    result = [f"uniform float _values[{total_uniform_value_count(uniforms)}];"]
+    value_index = 0
 
-    # Combine all uniforms of the same type into a single definition, e.g. "uniform float u1, u2, u3;", because
-    # the shader minifier doesn't optimize this by itself
-    result = []
+    for uniform in uniforms:
+        value_expression = glsl_uniform_value_expression(uniform, value_index)
+        result.append(f"{UNIFORM_TYPE_TO_OPENGL_TYPE[uniform.type]} {uniform.name} = {value_expression};")
+        value_index += number_of_params(uniform)
 
-    for uniform_type, uniforms_of_type in itertools.groupby(
-        sorted(uniforms, key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]), key=lambda u: UNIFORM_TYPE_TO_OPENGL_TYPE[u.type]
-    ):
-        uniform_definitions = ",".join([uniform.name for uniform in uniforms_of_type])
-        result.append(f"uniform {UNIFORM_TYPE_TO_OPENGL_TYPE[uniform_type]} {uniform_definitions};")
-
-    print("\n".join(result))
     return "\n".join(result)
 
 
@@ -360,7 +349,7 @@ def generate_minified_shader(shader_filename, uniforms: list[Uniform], consts: l
         shader_code = f.read()
 
     # Add _t as uniform here so it gets minified with the rest
-    uniform_definitions = generate_uniform_definitions([*uniforms, Uniform("_t", "float", [], None)])
+    uniform_definitions = generate_uniform_definitions([Uniform("_t", "float", [], None), *uniforms])
 
     const_definition_list = [f"const {const.type} {const.name} = {const.value};" for const in consts]
     const_definitions = "\n".join(const_definition_list)

@@ -29,12 +29,13 @@ static char* strs[] = {
     "glGetShaderiv",
     "glGetShaderInfoLog",
     "glBlitFramebuffer",
-    "glUniform1i",
+    "glUniform1fv",
+#ifdef DEBUG
     "glUniform1f",
+    "glUniform1i",
     "glUniform2f",
     "glUniform3f",
     "glUniform4f",
-#ifdef DEBUG
     "glGenFramebuffers",
     "glBindFramebuffer",
     "glFramebufferTexture2D",

@@ -9,9 +9,9 @@
 #include "glext.h"
 
 #ifdef DEBUG
-#define NUM_FUNCTIONS 29
+#define NUM_FUNCTIONS 30
 #else
-#define NUM_FUNCTIONS 23
+#define NUM_FUNCTIONS 19
 #endif
 
 extern void* myglfunc[NUM_FUNCTIONS];
@@ -34,19 +34,20 @@ extern void* myglfunc[NUM_FUNCTIONS];
 #define glGetShaderiv ((PFNGLGETSHADERIVPROC)myglfunc[15])
 #define glGetShaderInfoLog ((PFNGLGETSHADERINFOLOGPROC)myglfunc[16])
 #define glBlitFramebuffer ((PFNGLBLITFRAMEBUFFERPROC)myglfunc[17])
-#define glUniform1i ((PFNGLUNIFORM1IPROC)myglfunc[18])
-#define glUniform1f ((PFNGLUNIFORM1FPROC)myglfunc[19])
-#define glUniform2f ((PFNGLUNIFORM2FPROC)myglfunc[20])
-#define glUniform3f ((PFNGLUNIFORM3FPROC)myglfunc[21])
-#define glUniform4f ((PFNGLUNIFORM4FPROC)myglfunc[22])
+#define glUniform1fv ((PFNGLUNIFORM1FVPROC)myglfunc[18])
 
 #ifdef DEBUG
-#define glGenFramebuffers ((PFNGLGENFRAMEBUFFERSPROC)myglfunc[23])
-#define glBindFramebuffer ((PFNGLBINDFRAMEBUFFERPROC)myglfunc[24])
-#define glFramebufferTexture2D ((PFNGLFRAMEBUFFERTEXTURE2DPROC)myglfunc[25])
-#define glGetProgramInfoLog ((PFNGLGETPROGRAMINFOLOGPROC)myglfunc[26])
-#define glCheckFramebufferStatus ((PFNGLCHECKFRAMEBUFFERSTATUSPROC)myglfunc[27])
-#define glDeleteProgram ((PFNGLDELETEPROGRAMPROC)myglfunc[28])
+#define glUniform1f ((PFNGLUNIFORM1FPROC)myglfunc[19])
+#define glUniform1i ((PFNGLUNIFORM1IPROC)myglfunc[20])
+#define glUniform2f ((PFNGLUNIFORM2FPROC)myglfunc[21])
+#define glUniform3f ((PFNGLUNIFORM3FPROC)myglfunc[22])
+#define glUniform4f ((PFNGLUNIFORM4FPROC)myglfunc[23])
+#define glGenFramebuffers ((PFNGLGENFRAMEBUFFERSPROC)myglfunc[24])
+#define glBindFramebuffer ((PFNGLBINDFRAMEBUFFERPROC)myglfunc[25])
+#define glFramebufferTexture2D ((PFNGLFRAMEBUFFERTEXTURE2DPROC)myglfunc[26])
+#define glGetProgramInfoLog ((PFNGLGETPROGRAMINFOLOGPROC)myglfunc[27])
+#define glCheckFramebufferStatus ((PFNGLCHECKFRAMEBUFFERSTATUSPROC)myglfunc[28])
+#define glDeleteProgram ((PFNGLDELETEPROGRAMPROC)myglfunc[29])
 
 #endif
 

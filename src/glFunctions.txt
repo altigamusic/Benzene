@@ -17,11 +17,12 @@ glGetProgramiv
 glGetShaderiv
 glGetShaderInfoLog
 glBlitFramebuffer
-glUniform1i
-glUniform1f
-glUniform2f
-glUniform3f
-glUniform4f
+glUniform1fv
++glUniform1f
++glUniform1i
++glUniform2f
++glUniform3f
++glUniform4f
 +glGenFramebuffers
 +glBindFramebuffer
 +glFramebufferTexture2D
