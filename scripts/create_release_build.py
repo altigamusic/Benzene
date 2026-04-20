@@ -250,7 +250,7 @@ def generate_release_file_code(uniforms, include_tension: bool):
             if number_of_keyframes == 0:
                 value = "0.0f"
             else:
-                value = f"valueAtTime(time, keyframes{kf_index + j}, {number_of_keyframes})"
+                value = f"valueAtTimeAsm(time, keyframes{kf_index + j}, {number_of_keyframes})"
             value_assignments.append(f"    values[{value_index}] = {value};")
             value_index += 1
 

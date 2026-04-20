@@ -55,6 +55,95 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
     return keyframes[i - 1].value + (keyframes[i].value - keyframes[i - 1].value) * t;
 }
 
+static const float valueAtTimeAsmExponent = DEFAULT_INTERPOLATION_FACTOR;
+static const float valueAtTimeAsmHalf = 0.5f;
+
+__declspec(naked) inline float valueAtTimeAsm(float time, Keyframe* keyframes, int keyframeCount)
+{
+    __asm
+    {
+        push ebx
+        mov ebx, DWORD PTR [esp + 12]
+        mov ecx, DWORD PTR [esp + 16]
+        fld DWORD PTR [esp + 8]
+
+scanLoop:
+        ficom DWORD PTR [ebx]
+        fnstsw ax
+        sahf
+        jb foundRange
+        add ebx, 9
+        dec ecx
+        jnz scanLoop
+
+        fstp st(0)
+        fld DWORD PTR [ebx - 5]
+        pop ebx
+        ret 12
+
+foundRange:
+        fild DWORD PTR [ebx - 9]
+        fsubp st(1), st(0)
+        mov eax, DWORD PTR [ebx]
+        sub eax, DWORD PTR [ebx - 9]
+        push eax
+        fidiv DWORD PTR [esp]
+        add esp, 4
+
+        cmp BYTE PTR [ebx + 8], 1
+        je stepInterpolation
+#ifdef INCLUDE_GAIN
+        cmp BYTE PTR [ebx + 8], 3
+        jne finishInterpolation
+
+        sub esp, 4
+        fst DWORD PTR [esp]
+        cmp DWORD PTR [esp], 3f000000h
+        jb gainLowerHalf
+
+        fstp st(0)
+        fld1
+        fsub DWORD PTR [esp]
+        add esp, 4
+        fadd st(0), st(0)
+        sub esp, 16
+        fstp QWORD PTR [esp]
+        fld DWORD PTR valueAtTimeAsmExponent
+        fstp QWORD PTR [esp + 8]
+        call pow
+        add esp, 16
+        fmul DWORD PTR valueAtTimeAsmHalf
+        fld1
+        fsubrp st(1), st(0)
+        jmp finishInterpolation
+
+gainLowerHalf:
+        add esp, 4
+        fadd st(0), st(0)
+        sub esp, 16
+        fstp QWORD PTR [esp]
+        fld DWORD PTR valueAtTimeAsmExponent
+        fstp QWORD PTR [esp + 8]
+        call pow
+        add esp, 16
+        fmul DWORD PTR valueAtTimeAsmHalf
+#endif
+
+finishInterpolation:
+        fld DWORD PTR [ebx + 4]
+        fsub DWORD PTR [ebx - 5]
+        fmulp st(1), st(0)
+        fadd DWORD PTR [ebx - 5]
+        pop ebx
+        ret 12
+
+stepInterpolation:
+        fstp st(0)
+        fldz
+        jmp finishInterpolation
+    }
+}
+
 void locateUniforms(GLuint program);
 void updateUniforms(long time);
 
