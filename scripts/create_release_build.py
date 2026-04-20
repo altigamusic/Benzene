@@ -1,3 +1,4 @@
+import math
 import os
 import subprocess
 from dataclasses import dataclass
@@ -182,8 +183,8 @@ def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension
             normalized_values[uniform_index] = [1.0] * len(keyframe_values)
             continue
 
-        factors[uniform_index] = 127 / max_value
-        normalized_values[uniform_index] = [round(v * factors[uniform_index]) for v in keyframe_values]
+        factors[uniform_index] = math.ceil(127 / max_value)
+        normalized_values[uniform_index] = [min(127, max(-128, round(v * factors[uniform_index]))) for v in keyframe_values]
 
     array_rows = []
     for i, keyframe_values in enumerate(zip(*normalized_values, strict=True)):
@@ -207,7 +208,7 @@ ByteKeyframe byteKeyframes[] = {{
     {",\n    ".join(array_rows)}
 }};
 
-float divisionFactors[{number_of_values}] = {{{", ".join(f"{factor:f}f" for factor in factors)}}};
+unsigned char divisionFactors[{number_of_values}] = {{{", ".join(f"{factor}" for factor in factors)}}};
 Keyframe tempArray[{number_of_keyframes}] = {{}};
 """
 
@@ -220,9 +221,11 @@ def generate_byte_keyframe_updates(uniforms: list[Uniform] | None, offset: int, 
     number_of_keyframes = len(uniforms[0].keyframes)
 
     if include_tension:
-        declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / divisionFactors[k], byteKeyframes[i].interpolation, byteKeyframes[i].tension}"
+        declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / ((float)divisionFactors[k]), byteKeyframes[i].interpolation, byteKeyframes[i].tension}"
     else:
-        declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / divisionFactors[k], byteKeyframes[i].interpolation}"
+        declaration = (
+            "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / ((float)divisionFactors[k]), byteKeyframes[i].interpolation}"
+        )
 
     return f"""
     for (int k = 0; k < {number_of_values}; k++)
