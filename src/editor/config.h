@@ -12,6 +12,7 @@ struct BenzeneConfig
     int resolutionX = 800;
     int resolutionY = 600;
     int shaderQuantizationDigits = 6;
+    bool saveCameraAsBytes = false;
     std::vector<Uniform> uniformList;
     std::optional<Uniform> cameraPosition;
     std::optional<Uniform> cameraRotation;

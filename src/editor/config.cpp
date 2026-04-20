@@ -140,6 +140,10 @@ BenzeneConfig loadConfig(const std::string& filename)
     {
         config.shaderQuantizationDigits = configJson["shaderQuantizationDigits"].get<int>();
     }
+    if (configJson.contains("saveCameraAsBytes") && configJson["saveCameraAsBytes"].is_boolean())
+    {
+        config.saveCameraAsBytes = configJson["saveCameraAsBytes"].get<bool>();
+    }
     if (configJson.contains("musicWavFile") && configJson["musicWavFile"].is_string())
     {
         config.musicWavFile = configJson["musicWavFile"].get<std::string>();
@@ -240,6 +244,7 @@ bool saveConfig(const BenzeneConfig& config, const std::string& filename)
         {"lengthInBeats",            config.lengthInBeats                                  },
         {"resolution",               json ::array({config.resolutionX, config.resolutionY})},
         {"shaderQuantizationDigits", config.shaderQuantizationDigits                       },
+        {"saveCameraAsBytes",        config.saveCameraAsBytes                              },
         {"version",                  CURRENT_VERSION                                       },
     };
 

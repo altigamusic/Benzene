@@ -271,6 +271,17 @@ void renderSettingsWindow()
         if (editorState.config.shaderQuantizationDigits < 0) editorState.config.shaderQuantizationDigits = 0;
     }
 
+    ImGui::Checkbox("Save camera keyframes as bytes", &editorState.config.saveCameraAsBytes);
+    if (ImGui::BeginItemTooltip())
+    {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(
+            "Combine all camera keyframes into one array and save its values as bytes instead of floats.\n"
+            "This reduces size significantly but requires testing the loss of accuracy.");
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
     ImGui::End();
 }
 

@@ -127,7 +127,8 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     index = 0
 
     for uniform in uniforms:
-        for i in range(number_of_params(uniform)):
+        param_count = number_of_params(uniform)
+        for i in range(param_count):
             kf_array = ", ".join(keyframe_to_array_string(kf, i, include_tension) for kf in uniform.keyframes)
 
             if len(kf_array) > 0:
@@ -135,7 +136,105 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
 
             index += 1
 
-    return arrays
+    return "\n".join(arrays)
+
+
+def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension: bool):
+    if not uniforms:
+        return ""
+
+    number_of_values = sum(number_of_params(uniform) for uniform in uniforms)
+
+    zipped_keyframes: list[list[Keyframe]] = zip(*(uniform.keyframes for uniform in uniforms), strict=True)
+
+    max_values = [None] * number_of_values
+    all_values: list[list[float]] = [[] for _ in range(number_of_values)]
+
+    for value_keyframes in zipped_keyframes:
+        time = value_keyframes[0].time
+        interpolation = value_keyframes[0].interpolation
+        tension = value_keyframes[0].tension
+
+        for other_kf in value_keyframes[1:]:
+            if time != other_kf.time or interpolation != other_kf.interpolation or abs(tension - other_kf.tension) > 1e-6:
+                raise ValueError("Invalid camera keyframes - cannot optimize as bytes.")
+
+        idx = 0
+        for kf in value_keyframes:
+            for v in kf.values:
+                if max_values[idx] is None or abs(v) > max_values[idx]:
+                    max_values[idx] = abs(v)
+                all_values[idx].append(v)
+                idx += 1
+
+    # Normalize values and get factors
+    # Factors are used to increase precision if the numbers are small
+    normalized_values = [[] for _ in range(number_of_values)]
+    factors = [1.0] * number_of_values
+
+    for uniform_index, uniform_values in enumerate(all_values):
+        max_value = max_values[uniform_index]
+
+        if max_value <= 1e-6:
+            # Set everything to 1s
+            factors[uniform_index] = max_value
+            normalized_values[uniform_index] = [1.0] * len(uniform_values)
+            continue
+
+        factors[uniform_index] = 127 / max_value
+        normalized_values[uniform_index] = [round(v * factors[uniform_index]) for v in uniform_values]
+
+    array_rows = []
+    for i, keyframe_values in enumerate(zip(*normalized_values, strict=True)):
+        row = ", ".join(str(v) for v in keyframe_values)
+        sample_keyframe = uniforms[0].keyframes[i]
+
+        if include_tension:
+            array_rows.append(f"{{{sample_keyframe.time}, {sample_keyframe.interpolation}, {sample_keyframe.tension}, {{{row}}}}}")
+        else:
+            array_rows.append(f"{{{sample_keyframe.time}, {sample_keyframe.interpolation}, {{{row}}}}}")
+
+    return f"""
+struct ByteKeyframe {{
+    int time;
+    unsigned char interpolation;
+    {"" if include_tension else "//"} float tension;
+    char values[{number_of_values}];
+}};
+
+ByteKeyframe byteKeyframes[] = {{
+    {",\n    ".join(array_rows)}
+}};
+
+float divisionFactors[{number_of_values}] = {{{", ".join(f"{factor:f}f" for factor in factors)}}};
+"""
+
+
+def generate_byte_keyframe_updates(uniforms: list[Uniform] | None, offset: int, include_tension: bool):
+    if not uniforms:
+        return ""
+
+    number_of_values = sum(number_of_params(uniform) for uniform in uniforms)
+    number_of_keyframes = len(uniforms[0].keyframes)
+
+    if include_tension:
+        declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / divisionFactors[k], byteKeyframes[i].interpolation, byteKeyframes[i].tension}"
+    else:
+        declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / divisionFactors[k], byteKeyframes[i].interpolation}"
+
+    return f"""
+    Keyframe tempArray[{number_of_keyframes}] = {{}};
+
+    for (int k = 0; k < {number_of_values}; k++)
+    {{
+        for (int i = 0; i < {number_of_keyframes}; i++)
+        {{
+            tempArray[i] = {declaration};
+        }}
+
+        values[k + {offset}] = valueAtTimeAsm(time, tempArray, {number_of_keyframes});
+    }}
+"""
 
 
 def total_uniform_value_count(uniforms: list[Uniform]):
@@ -234,9 +333,16 @@ def split_animated_and_const_uniforms(uniforms: list[Uniform], quantization_defa
     return animated_uniforms, consts
 
 
-def generate_release_file_code(uniforms, include_tension: bool):
+def generate_release_file_code(uniforms: list[Uniform], include_tension: bool, save_camera_as_bytes: bool):
+    camera_uniforms = None
+
+    if save_camera_as_bytes:
+        # Remove camera uniforms from keyframe creation
+        camera_uniforms = [uniform for uniform in uniforms if uniform.name in ("_cp", "_cr")]
+        uniforms = [uniform for uniform in uniforms if uniform.name not in ("_cp", "_cr")]
+
     # Generate all keyframe array declarations
-    keyframe_arrays = "\n".join(gen_keyframe_arrays(uniforms, include_tension))
+    keyframe_arrays = gen_keyframe_arrays(uniforms, include_tension)
 
     kf_index = 0
     value_index = 1
@@ -256,8 +362,14 @@ def generate_release_file_code(uniforms, include_tension: bool):
 
         kf_index += param_count
 
-    uniform_value_count = value_index
+    camera_uniform_value_count = (
+        sum(number_of_params(camera_uniform) for camera_uniform in camera_uniforms) if camera_uniforms is not None else 0
+    )
+    uniform_value_count = value_index + camera_uniform_value_count
     uniform_updates = "\n".join(value_assignments)
+
+    byte_keyframes = generate_byte_keyframe_array(camera_uniforms, include_tension)
+    byte_keyframe_updates = generate_byte_keyframe_updates(camera_uniforms, value_index, include_tension)
 
     return f"""#include "../release.h"
 
@@ -265,6 +377,7 @@ GLuint valuesUniformLocation = 0;
 float values[{uniform_value_count}] = {{0}};
 
 {keyframe_arrays}
+{byte_keyframes}
 
 void locateUniforms(GLuint program) {{
     valuesUniformLocation = glGetUniformLocation(program, VAR__values);
@@ -272,13 +385,14 @@ void locateUniforms(GLuint program) {{
 
 void updateUniforms(float time) {{
 {uniform_updates}
+{byte_keyframe_updates}
     glUniform1fv(valuesUniformLocation, {uniform_value_count}, values);
 }}
 """
 
 
-def generate_release_file(uniforms, output_filename, include_tension: bool):
-    release_file_code = generate_release_file_code(uniforms, include_tension)
+def generate_release_file(uniforms, output_filename, include_tension: bool, save_camera_as_bytes: bool):
+    release_file_code = generate_release_file_code(uniforms, include_tension, save_camera_as_bytes)
 
     with open(output_filename, "w") as f:
         f.write(release_file_code)
@@ -387,6 +501,7 @@ def main():
 
     uniforms, config = parse_config_file(config_filename)
     quantization_default_digits = get_shader_quantization_default(config)
+    save_camera_as_bytes = config.get("saveCameraAsBytes", False)
 
     if SHOULD_INJECT_CONSTS:
         animated_uniforms, consts = split_animated_and_const_uniforms(uniforms, quantization_default_digits)
@@ -397,7 +512,7 @@ def main():
     default_interpolation_factor = get_default_interpolation_factor(animated_uniforms)
     include_tension = default_interpolation_factor is None
 
-    generate_release_file(animated_uniforms, output_filename, include_tension)
+    generate_release_file(animated_uniforms, output_filename, include_tension, save_camera_as_bytes)
     print(f"Generated {output_filename}")
 
     generate_release_header(
