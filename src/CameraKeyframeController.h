@@ -10,6 +10,7 @@ class CameraKeyframeController
     float currentTime = 0;
     bool isLocked = true;
     bool shouldDisplayLockWarning = false;
+    bool isEndKeyframe = false;
 
     void displayKeyframeMarker();
     UniformValue getPositionValue();
@@ -18,7 +19,7 @@ class CameraKeyframeController
 
   public:
     CameraKeyframeController();
-    void startFrame(float currentTime);
+    void startFrame(float currentTime, bool isEnd);
     void displayImGuiWindow();
     void updateCamera(long timeDeltaMs);
 

@@ -28,11 +28,14 @@ class Uniform
     std::string group;
     std::optional<int> quantization;
 
-    UniformValue valueAtTime(float time, int defaultQuantizationDigits = -1);
-    void setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation = KeyframeInterpolation::Linear,
-        float interpolationFactor = 0.0f);
-    UniformKeyframe* getKeyframeAtTime(float time);
+    UniformValue valueAtTime(float time, bool isEnd, int defaultQuantizationDigits = -1);
+    void setKeyframeAtTime(float time, bool isEnd, const UniformValue& value,
+        KeyframeInterpolation interpolation = KeyframeInterpolation::Linear, float interpolationFactor = 0.0f);
+    void insertKeyframeAtTime(float time, bool isEnd, const UniformValue& value,
+        KeyframeInterpolation interpolation = KeyframeInterpolation::Linear, float interpolationFactor = 0.0f);
+    int countKeyframesAtTime(float time) const;
+    UniformKeyframe* getKeyframeAtTime(float time, bool isEnd);
     bool hasKeyframeAtTime(float time) const;
-    bool removeKeyframeAtTime(float time);
+    bool removeKeyframeAtTime(float time, bool isEnd);
     void setConstantValue(const UniformValue& value);
 };

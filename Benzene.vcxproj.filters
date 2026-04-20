@@ -36,6 +36,7 @@
     </ClCompile>
     <ClCompile Include="src\CameraKeyframeController.cpp" />
     <ClCompile Include="src\config.cpp" />
+    <ClCompile Include="src\keyframe_marker.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ext.h" />
@@ -79,6 +80,7 @@
     <ClInclude Include="src\config.h" />
     <ClInclude Include="src\generated\release_config.h" />
     <ClInclude Include="src\nlohmann\json.hpp" />
+    <ClInclude Include="src\keyframe_marker.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ImGui">

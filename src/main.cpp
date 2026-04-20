@@ -21,6 +21,7 @@
 #include <set>
 #include "imgui/imgui_benzene_widgets.h"
 #include "config.h"
+#include "keyframe_marker.h"
 
 int sidebarWidth;
 int sidebarHeight;
@@ -64,6 +65,7 @@ bool showSettingsWindow = false;
 
 bool isPlaying = true;
 bool isSpaceDown;
+bool isEndKeyframe = true;
 
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
@@ -266,7 +268,7 @@ void updateUniforms(const float ftime)
 
     for (Uniform& uniform : uniformList)
     {
-        auto value = uniform.valueAtTime(ftime, shaderQuantizationDigits);
+        auto value = uniform.valueAtTime(ftime, isEndKeyframe, shaderQuantizationDigits);
 
         switch (uniform.type)
         {
@@ -480,9 +482,9 @@ bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlayi
 
         if (uniform.group != group) continue;
 
-        UniformValue value = uniform.valueAtTime(time);
+        UniformValue value = uniform.valueAtTime(time, isEndKeyframe);
         bool didThisUniformChange = false;
-        UniformKeyframe* keyframeAtCurrentTime = uniform.getKeyframeAtTime(time);
+        UniformKeyframe* keyframeAtCurrentTime = uniform.getKeyframeAtTime(time, isEndKeyframe);
 
         switch (uniform.type)
         {
@@ -584,12 +586,22 @@ bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlayi
             hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolation : KeyframeInterpolation::Linear;
         float tension = hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
 
+        bool canSplitToDual = hasKeyframeAtCurrentTime && uniform.countKeyframesAtTime(time) < 2;
+        bool shouldSplitToDual = false;
+
         ImGui::SameLine();
-        bool didKeyframeInfoChange =
-            KeyframeMarker((uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension);
+        bool didKeyframeInfoChange = KeyframeMarkerWithContextMenu(
+            (uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension, canSplitToDual, &shouldSplitToDual);
+
+        if (shouldSplitToDual && keyframeAtCurrentTime != nullptr)
+        {
+            uniform.insertKeyframeAtTime(time, true, keyframeAtCurrentTime->value, interpolation, tension);
+            didAnythingChange = true;
+            shouldKeepPlaying = false;
+        }
 
         float lastKeyframeTime = uniform.keyframes.empty() ? 0 : uniform.keyframes.back().time;
-        bool isBeyondLastKeyframe = lastKeyframeTime <= time;
+        bool isBeyondLastKeyframe = time > lastKeyframeTime;
 
         // Set a keyframe if the uniform changed *only if* it's before another keyframe!
         // This is because if it's after the last one, it's more natural to just update the last keyframe value instead.
@@ -604,19 +616,19 @@ bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlayi
 
         if (shouldSetKeyframe)
         {
-            uniform.setKeyframeAtTime(time, value, interpolation, tension);
+            uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
             didAnythingChange = true;
             shouldKeepPlaying = false; // Pause only if a keyframe was created, no other reason
         }
         else if (shouldUpdateLastKeyframeValue)
         {
-            uniform.setKeyframeAtTime(lastKeyframeTime, value, interpolation, tension);
+            uniform.setKeyframeAtTime(lastKeyframeTime, true, value, interpolation, tension);
             didAnythingChange = true;
         }
         else if (shouldRemoveKeyframe)
         {
             // Remove the keyframe at the current time
-            uniform.removeKeyframeAtTime(time);
+            uniform.removeKeyframeAtTime(time, isEndKeyframe);
             didAnythingChange = true;
         }
     }
@@ -796,13 +808,22 @@ std::vector<int> getAllKeyframes()
 
     auto appendKeyframes = [&keyframes](const Uniform& uniform)
     {
+        int previousTime = -1;
         for (const UniformKeyframe& keyframe : uniform.keyframes)
         {
             int time = static_cast<int>(keyframe.time);
-            if (std::find(keyframes.begin(), keyframes.end(), time) == keyframes.end())
+            auto f = std::find(keyframes.begin(), keyframes.end(), time);
+            if (f == keyframes.end())
             {
                 keyframes.push_back(time);
             }
+            // If this is a dual keyframe, make sure the array also has a dual keyframe
+            else if (previousTime == time && (f + 1 == keyframes.end() || *(f + 1) != time))
+            {
+                keyframes.insert(f + 1, time);
+            }
+
+            previousTime = time;
         }
     };
 
@@ -819,12 +840,29 @@ std::vector<int> getAllKeyframes()
     return keyframes;
 }
 
+float getSnappedKeyframePosition(KeyframeMovementData& kfMovement, float maxTime, const std::vector<float>& keyframes)
+{
+    float minValue = kfMovement.index == 0 ? 0 : keyframes[kfMovement.index - 1];
+    float maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : keyframes[kfMovement.index + 1];
+
+    // If the keyframe on either side is already dual, prevent merging another keyframe into it by restricting the bounds
+    bool isDualKeyframeBefore = kfMovement.index > 1 && keyframes[kfMovement.index - 1] == keyframes[kfMovement.index - 2];
+    bool isDualKeyframeAfter =
+        kfMovement.index < keyframes.size() - 2 && keyframes[kfMovement.index + 1] == keyframes[kfMovement.index + 2];
+
+    if (isDualKeyframeBefore) minValue += 1;
+    if (isDualKeyframeAfter) maxValue -= 1;
+
+    // Round to snap keyframes
+    return std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
+}
+
 bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopStart = nullptr, float* loopEnd = nullptr)
 {
     bool didChange = false;
 
     ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
-    didChange |= TimeSlider("Time", time, minTime, maxTime, loopStart, loopEnd);
+    didChange |= TimeSlider("Time", time, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
 
     if (cameraController.positionUniform.keyframes.size() > 1)
     {
@@ -836,14 +874,11 @@ bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopSta
             keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
-        if (KeyframeSlider("Camera", time, minTime, maxTime, keyframes, &kfMovement))
+        if (KeyframeSlider("Camera", time, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
             {
-                float minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
-                float maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
-                // Round to snap keyframes
-                float newTime = std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
+                float newTime = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
 
                 cameraController.positionUniform.keyframes[kfMovement.index].time = newTime;
                 cameraController.rotationUniform.keyframes[kfMovement.index].time = newTime;
@@ -865,17 +900,10 @@ bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopSta
 
         KeyframeMovementData kfMovement;
 
-        if (KeyframeSlider(uniform.name.c_str(), time, minTime, maxTime, keyframes, &kfMovement))
+        if (KeyframeSlider(uniform.name.c_str(), time, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
-            {
-                // Move the keyframe - prevent overlapping by restricting the bounds
-                float minValue = kfMovement.index == 0 ? 0 : (keyframes[kfMovement.index - 1] + 1);
-                float maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : (keyframes[kfMovement.index + 1] - 1);
-
-                // Round to snap keyframes
-                uniform.keyframes[kfMovement.index].time = std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
-            }
+                uniform.keyframes[kfMovement.index].time = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
 
             didChange = true;
         }
@@ -884,24 +912,50 @@ bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopSta
     return didChange;
 }
 
-int findPreviousKeyframe(int t, const std::vector<int>& keyframes)
+bool hasDualKeyframe(const int t, const std::vector<int>& keyframes)
 {
+    auto it = std::find(keyframes.begin(), keyframes.end(), t);
+    return it != keyframes.end() && it + 1 != keyframes.end() && *(it + 1) == t;
+}
+
+int findPreviousKeyframe(int t, const std::vector<int>& keyframes, bool& isEnd)
+{
+    // Check dual keyframes
+    if (isEnd && hasDualKeyframe(t, keyframes))
+    {
+        // We're on the end half of a dual keyframe - move to the start half
+        isEnd = false;
+        return t;
+    }
+
     auto it = std::lower_bound(keyframes.begin(), keyframes.end(), t);
 
     if (it != keyframes.begin())
     {
         --it;
+        isEnd = true; // When moving back we always move to the end
         return *it;
     }
 
     return -1; // No previous keyframe
 }
 
-int findNextKeyframe(int t, const std::vector<int>& keyframes)
+int findNextKeyframe(int t, const std::vector<int>& keyframes, bool& isEnd)
 {
+    if (!isEnd && hasDualKeyframe(t, keyframes))
+    {
+        // We're on the start half of a dual keyframe - move to the end half
+        isEnd = true;
+        return t;
+    }
+
     auto it = std::upper_bound(keyframes.begin(), keyframes.end(), t);
 
-    if (it != keyframes.end()) return *it;
+    if (it != keyframes.end())
+    {
+        isEnd = false; // When moving forward we always move to the start
+        return *it;
+    }
 
     return -1; // No next keyframe
 }
@@ -918,7 +972,7 @@ bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool for
     {
         if (io.KeyCtrl || backButton)
         {
-            int prevKeyframe = findPreviousKeyframe(t, keyframes);
+            int prevKeyframe = findPreviousKeyframe(t, keyframes, isEndKeyframe);
 
             if (prevKeyframe != -1)
             {
@@ -926,9 +980,16 @@ bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool for
                 return true;
             }
         }
+        else if (isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
+        {
+            // If we're on the end half of a dual keyframe, move to the start half without changing the time
+            isEndKeyframe = false;
+            return true;
+        }
         else
         {
             t = max(0, std::ceil(t) - 1);
+            isEndKeyframe = true; // When moving back we always move to the end
             return true;
         }
     }
@@ -937,7 +998,7 @@ bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool for
     {
         if (io.KeyCtrl || forwardButton)
         {
-            int nextKeyframe = findNextKeyframe(t, keyframes);
+            int nextKeyframe = findNextKeyframe(t, keyframes, isEndKeyframe);
 
             if (nextKeyframe != -1)
             {
@@ -945,9 +1006,16 @@ bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool for
                 return true;
             }
         }
+        else if (!isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
+        {
+            // If we're on the start half of a dual keyframe, move to the end half without changing the time
+            isEndKeyframe = true;
+            return true;
+        }
         else
         {
             t = min(maxTimelineTime, std::floor(t) + 1);
+            isEndKeyframe = false; // When moving forward we always move to the start
             return true;
         }
     }
@@ -1092,7 +1160,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
                 t = fmodf(t, demoTimeLength);
         }
 
-        cameraController.startFrame(t);
+        cameraController.startFrame(t, isEndKeyframe);
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {

@@ -88,7 +88,8 @@ bool DragVector2(
     return value_changed;
 }
 
-bool KeyframeSlider(const char* label, float* data, float min, float max, std::vector<float>& keyframes, KeyframeMovementData* movement)
+bool KeyframeSlider(
+    const char* label, float* data, bool* isEnd, float min, float max, const std::vector<float>& keyframes, KeyframeMovementData* movement)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_FrameBg);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
@@ -132,17 +133,30 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
             auto kf = std::find_if(keyframes.begin(), keyframes.end(),
                 [new_value, snapThresholdValue](float kf) { return abs(kf - new_value) <= snapThresholdValue; });
 
-            draggedKeyframeIndex = kf == keyframes.end() ? -1 : kf - keyframes.begin();
+            // Check for dual keyframes
+            if (kf == keyframes.end())
+                draggedKeyframeIndex = -1;
+            else
+            {
+                // If this is a dual keyframe and the click position is to the right of the keyframe,
+                // we select the end half (the next keyframe)
+                auto nextKf = kf + 1;
+                if (nextKf != keyframes.end() && *nextKf == *kf && new_value > *kf) kf = nextKf;
+
+                draggedKeyframeIndex = kf == keyframes.end() ? -1 : kf - keyframes.begin();
+            }
         }
         else
         {
             // Snap to whole number
+            float fractionalValue = new_value;
             new_value = roundf(new_value);
 
             // Move the time slider
             if (new_value != *data)
             {
                 *data = new_value;
+                if (isEnd != nullptr) *isEnd = fractionalValue > new_value;
                 value_changed = true;
             }
 
@@ -187,13 +201,33 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
 
         // Keyframes are rhombus-shaped
         ImVec2 rhombus_center = ImVec2(kf_x, pos.y + size.y * 0.5f);
-        ImVec2 rhombus_points[4] = {rhombus_center + ImVec2(0, -KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(KEYFRAME_SIZE * 0.5f, 0),
-            rhombus_center + ImVec2(0, KEYFRAME_SIZE * 0.5f), rhombus_center + ImVec2(-KEYFRAME_SIZE * 0.5f, 0)};
+        ImVec2 rhombus_top = rhombus_center + ImVec2(0, -KEYFRAME_SIZE * 0.5f);
+        ImVec2 rhombus_right = rhombus_center + ImVec2(KEYFRAME_SIZE * 0.5f, 0);
+        ImVec2 rhombus_bottom = rhombus_center + ImVec2(0, KEYFRAME_SIZE * 0.5f);
+        ImVec2 rhombus_left = rhombus_center + ImVec2(-KEYFRAME_SIZE * 0.5f, 0);
+        ImVec2 rhombus_points[4] = {rhombus_top, rhombus_right, rhombus_bottom, rhombus_left};
 
         bool isBeingDragged = draggedKeyframeIndex >= 0 && kfIndex == draggedKeyframeIndex && draggedId == id;
-        auto keyframeColor = isBeingDragged ? KEYFRAME_DRAGGED_COLOR : (kf == *data) ? KEYFRAME_ACTIVE_COLOR : KEYFRAME_INACTIVE_COLOR;
+        bool isLeftHalf = (kfIndex + 1 < keyframes.size() && keyframes[kfIndex + 1] == kf);
+        bool isRightHalf = (kfIndex > 0 && keyframes[kfIndex - 1] == kf);
+        bool isDualKeyframe = isLeftHalf || isRightHalf;
+        bool isActive = (kf == *data) && (!isDualKeyframe || isEnd == nullptr || (isRightHalf ? *isEnd : !*isEnd));
 
-        draw_list->AddConvexPolyFilled(rhombus_points, 4, keyframeColor);
+        auto keyframeColor = isBeingDragged ? KEYFRAME_DRAGGED_COLOR : (isActive ? KEYFRAME_ACTIVE_COLOR : KEYFRAME_INACTIVE_COLOR);
+
+        if (isLeftHalf)
+        {
+            draw_list->AddTriangleFilled(rhombus_top, rhombus_left, rhombus_bottom, keyframeColor);
+        }
+        else if (isRightHalf)
+        {
+            draw_list->AddTriangleFilled(rhombus_top, rhombus_bottom, rhombus_right, keyframeColor);
+            draw_list->AddLine(rhombus_top, rhombus_bottom, KEYFRAME_OUTLINE_COLOR, 2.0f);
+        }
+        else
+        {
+            draw_list->AddConvexPolyFilled(rhombus_points, 4, keyframeColor);
+        }
 
         draw_list->AddPolyline(rhombus_points, 4, KEYFRAME_OUTLINE_COLOR, ImDrawFlags_Closed, 2.);
     }
@@ -207,7 +241,7 @@ bool KeyframeSlider(const char* label, float* data, float min, float max, std::v
     return value_changed;
 }
 
-bool TimeSlider(const char* label, float* data, float min, float max, float* loopStart, float* loopEnd)
+bool TimeSlider(const char* label, float* data, bool* isEnd, float min, float max, float* loopStart, float* loopEnd)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_Text);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
@@ -284,6 +318,7 @@ bool TimeSlider(const char* label, float* data, float min, float max, float* loo
                 if (new_value != *data)
                 {
                     *data = new_value;
+                    if (isEnd != nullptr) *isEnd = mouseValue > new_value;
                     value_changed = true;
                 }
             }
@@ -378,26 +413,7 @@ bool TimeSlider(const char* label, float* data, float min, float max, float* loo
     return value_changed;
 }
 
-const int NUM_POSSIBLE_INTERPOLATIONS = 4;
-const KeyframeInterpolation POSSIBLE_INTERPOLATIONS[] = {
-    KeyframeInterpolation::Linear, KeyframeInterpolation::Step, KeyframeInterpolation::Tonemap, KeyframeInterpolation::Gain};
-const char* INTERPOLATION_NAMES[] = {"Linear", "Step", "Power (ease-in/ease-out)", "Gain (ease-in-out)"};
-
-static void PlotTension(KeyframeInterpolation interpolation, float tension)
-{
-    constexpr size_t PLOT_RESOLUTION = 100;
-    float values[PLOT_RESOLUTION] = {0};
-
-    for (int i = 0; i < PLOT_RESOLUTION; i++)
-    {
-        float x = (float)i / PLOT_RESOLUTION;
-        values[i] = interpolate0to1(x, interpolation, tension);
-    }
-
-    ImGui::PlotLines("##TensionGraph", values, PLOT_RESOLUTION);
-}
-
-bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension)
+bool KeyframeMarker(const char* label, bool* data)
 {
     const ImU32 KEYFRAME_OUTLINE_COLOR = GetColorU32(ImGuiCol_SliderGrabActive);
     const ImU32 KEYFRAME_INACTIVE_COLOR = GetColorU32(ImGuiCol_FrameBg);
@@ -438,31 +454,6 @@ bool KeyframeMarker(const char* label, bool* data, KeyframeInterpolation* interp
     auto color = *data ? KEYFRAME_ACTIVE_COLOR : (hovered ? KEYFRAME_HOVERED_COLOR : KEYFRAME_INACTIVE_COLOR);
     draw_list->AddConvexPolyFilled(rhombus_points, 4, color);
     draw_list->AddPolyline(rhombus_points, 4, KEYFRAME_OUTLINE_COLOR, ImDrawFlags_Closed, 1.);
-
-    if (*data && BeginPopupContextItem(label))
-    {
-        for (int i = 0; i < NUM_POSSIBLE_INTERPOLATIONS; i++)
-        {
-            bool is_selected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
-
-            if (Selectable(INTERPOLATION_NAMES[i], is_selected))
-            {
-                *interpolation = POSSIBLE_INTERPOLATIONS[i];
-                pressed = true;
-            }
-
-            if (is_selected) SetItemDefaultFocus();
-        }
-
-        if (SliderFloat("Tension", tension, 0.0f, 1.0f, "%.2f"))
-        {
-            pressed = true;
-        }
-
-        PlotTension(*interpolation, *tension);
-
-        EndPopup();
-    }
 
     return pressed;
 }

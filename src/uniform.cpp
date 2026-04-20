@@ -2,6 +2,7 @@
 #include <gl/GL.h>
 #include "uniform.h"
 #include <algorithm>
+#include <stdexcept>
 
 UniformValue getDefault(UniformType type)
 {
@@ -158,9 +159,11 @@ float interpolateTime(float time, float startTime, float endTime, float prevValu
 /// Get the uniform value at the given time, based on its keyframes.
 /// </summary>
 /// <param name="time">The time to get the value at.</param>
-/// <param name="defaultQuantizationDigits">The default number of digits to round the keyframes to. If this value is -1, no rounding is
-/// performed.</param> <returns></returns>
-UniformValue Uniform::valueAtTime(float time, int defaultQuantizationDigits)
+/// <param name="isEnd">True if the end half should be used if there are dual keyframes at this time, and false if the start one should be
+/// used.</param>
+/// <param name="defaultQuantizationDigits">The default number of digits to round the keyframes to. If this value is -1, no
+/// rounding is performed.</param> <returns></returns>
+UniformValue Uniform::valueAtTime(float time, bool isEnd, int defaultQuantizationDigits)
 {
     if (keyframes.empty()) return getDefault(type);
 
@@ -172,9 +175,18 @@ UniformValue Uniform::valueAtTime(float time, int defaultQuantizationDigits)
         std::find_if(keyframes.rbegin(), keyframes.rend(), [time](const UniformKeyframe& kf) { return kf.time <= time; });
 
     if (previousKeyframe == keyframes.rend())
+    {
         return quantizeValue(keyframes.begin()->value, type, digits, isBinaryRounding);
+    }
+    else if (previousKeyframe->time == time && (previousKeyframe + 1) != keyframes.rend() && (previousKeyframe + 1)->time == time)
+    {
+        // If the keyframe before this one has the same time, it's a dual keyframe and we just return the correct one's value
+        return quantizeValue(isEnd ? previousKeyframe->value : (previousKeyframe + 1)->value, type, digits, isBinaryRounding);
+    }
     else if (previousKeyframe == keyframes.rbegin())
+    {
         return quantizeValue(previousKeyframe->value, type, digits, isBinaryRounding);
+    }
 
     auto nextKeyframe = previousKeyframe.base();
 
@@ -216,7 +228,8 @@ UniformValue Uniform::valueAtTime(float time, int defaultQuantizationDigits)
     return result;
 }
 
-void Uniform::setKeyframeAtTime(float time, const UniformValue& value, KeyframeInterpolation interpolation, float interpolationFactor)
+void Uniform::setKeyframeAtTime(
+    float time, bool isEnd, const UniformValue& value, KeyframeInterpolation interpolation, float interpolationFactor)
 {
     UniformKeyframe keyframe{};
     keyframe.time = time;
@@ -230,6 +243,11 @@ void Uniform::setKeyframeAtTime(float time, const UniformValue& value, KeyframeI
     if (it != keyframes.end() && it->time == time)
     {
         // If the keyframe already exists at this time, replace it
+
+        // Check for duals - if this is a dual keyframe and isEnd is true, replace the end one
+        auto nextKeyframe = it + 1;
+        if (isEnd && nextKeyframe != keyframes.end() && nextKeyframe->time == time) it = nextKeyframe;
+
         *it = keyframe;
         return;
     }
@@ -237,34 +255,80 @@ void Uniform::setKeyframeAtTime(float time, const UniformValue& value, KeyframeI
     keyframes.insert(it, keyframe);
 }
 
-UniformKeyframe* Uniform::getKeyframeAtTime(float time)
+void Uniform::insertKeyframeAtTime(
+    float time, bool isEnd, const UniformValue& value, KeyframeInterpolation interpolation, float interpolationFactor)
 {
-    auto result = std::find_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
-    return result != keyframes.end() ? &(*result) : nullptr;
-}
+    UniformKeyframe keyframe{};
+    keyframe.time = time;
+    keyframe.value = value;
+    keyframe.interpolation = interpolation;
+    keyframe.interpolationFactor = interpolationFactor;
 
-bool Uniform::hasKeyframeAtTime(float time) const
-{
-    auto result = std::find_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
-    return result != keyframes.end();
-}
+    auto it = std::lower_bound(
+        keyframes.begin(), keyframes.end(), keyframe, [](const UniformKeyframe& a, const UniformKeyframe& b) { return a.time < b.time; });
 
-bool Uniform::removeKeyframeAtTime(float time)
-{
-    auto it = std::remove_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+    bool isDualKeyframeEnd = false;
 
-    bool found = it != keyframes.end();
-
-    if (found)
+    if (it != keyframes.end() && it->time == time)
     {
-        keyframes.erase(it, keyframes.end());
+        if (it + 1 != keyframes.end() && (it + 1)->time == time)
+        {
+            throw std::runtime_error("Cannot insert dual keyframe when there are already 2 keyframes at this time");
+        }
+
+        // If the keyframe already exists at this time, insert the new one after it if isEnd is true, otherwise before it
+        isDualKeyframeEnd = isEnd;
     }
 
-    return found;
+    auto insertPos = isDualKeyframeEnd ? it + 1 : it;
+    keyframes.insert(insertPos, keyframe);
+}
+
+int Uniform::countKeyframesAtTime(float time) const
+{
+    int count = 0;
+    for (const auto& keyframe : keyframes)
+    {
+        if (keyframe.time == time)
+            ++count;
+        else if (keyframe.time > time)
+            break;
+    }
+    return count;
+}
+
+UniformKeyframe* Uniform::getKeyframeAtTime(float time, bool isEnd)
+{
+    auto result = std::find_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+    if (result == keyframes.end()) return nullptr;
+
+    // Check for duals - if this is a dual keyframe and isEnd is true, return the end one
+    auto nextResult = result + 1;
+    if (isEnd && nextResult != keyframes.end() && nextResult->time == time) return &(*nextResult);
+
+    return &(*result);
+}
+
+bool Uniform::hasKeyframeAtTime(float time) const { return countKeyframesAtTime(time) > 0; }
+
+bool Uniform::removeKeyframeAtTime(float time, bool isEnd)
+{
+    auto result = std::find_if(keyframes.begin(), keyframes.end(), [time](const UniformKeyframe& kf) { return kf.time == time; });
+    if (result == keyframes.end()) return false;
+
+    auto nextKeyframe = result + 1;
+    if (isEnd && nextKeyframe != keyframes.end() && nextKeyframe->time == time)
+    {
+        keyframes.erase(nextKeyframe);
+        return true;
+    }
+
+    keyframes.erase(result);
+    return true;
 }
 
 void Uniform::setConstantValue(const UniformValue& value)
 {
     keyframes.clear();
-    setKeyframeAtTime(0.0f, value, KeyframeInterpolation::Step, 0.0f);
+    setKeyframeAtTime(0.0f, false, value, KeyframeInterpolation::Step, 0.0f);
 }

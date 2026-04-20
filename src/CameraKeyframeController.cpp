@@ -2,6 +2,7 @@
 #include "CameraKeyframeController.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_benzene_widgets.h"
+#include "keyframe_marker.h"
 
 CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", UniformType::Vec3), rotationUniform("_cr", UniformType::Vec2)
 {
@@ -9,8 +10,8 @@ CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", Un
 
 void CameraKeyframeController::moveCameraToKeyframe()
 {
-    UniformValue position = positionUniform.valueAtTime(currentTime, 6);
-    UniformValue rotation = rotationUniform.valueAtTime(currentTime, 6);
+    UniformValue position = positionUniform.valueAtTime(currentTime, isEndKeyframe, 6);
+    UniformValue rotation = rotationUniform.valueAtTime(currentTime, isEndKeyframe, 6);
     cameraController.position = {position.v3[0], position.v3[1], position.v3[2]};
     cameraController.xAngle = rotation.v2[0];
     cameraController.yAngle = rotation.v2[1];
@@ -18,12 +19,13 @@ void CameraKeyframeController::moveCameraToKeyframe()
     cameraController.markAsMoved();
 }
 
-void CameraKeyframeController::startFrame(float currentTime)
+void CameraKeyframeController::startFrame(float currentTime, bool isEnd)
 {
-    bool didTimeChange = this->currentTime != currentTime;
+    bool didTimeChange = this->currentTime != currentTime || isEndKeyframe != isEnd;
 
     cameraController.resetCameraMovementCheck();
     this->currentTime = currentTime;
+    isEndKeyframe = isEnd;
 
     if (isLocked && didTimeChange) moveCameraToKeyframe();
 }
@@ -49,8 +51,8 @@ UniformValue CameraKeyframeController::getRotationValue()
 
 void CameraKeyframeController::updateCamera(long timeDeltaMs)
 {
-    auto positionKeyframe = positionUniform.getKeyframeAtTime(currentTime);
-    auto rotationKeyframe = rotationUniform.getKeyframeAtTime(currentTime);
+    UniformKeyframe* positionKeyframe = positionUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
+    UniformKeyframe* rotationKeyframe = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
 
     if (isLocked && positionKeyframe == nullptr) return;
 
@@ -102,24 +104,37 @@ vec3 CameraKeyframeController::getRotation() { return {cameraController.xAngle, 
 
 void CameraKeyframeController::displayKeyframeMarker()
 {
-    UniformKeyframe* kf = positionUniform.getKeyframeAtTime(currentTime);
+    UniformKeyframe* kf = positionUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
+
     bool isKeyframe = kf != nullptr;
     KeyframeInterpolation interpolation = isKeyframe ? kf->interpolation : KeyframeInterpolation::Linear;
     float tension = isKeyframe ? kf->interpolationFactor : 0.5f;
+    bool canSplitToDual = isKeyframe && positionUniform.countKeyframesAtTime(currentTime) < 2;
+    bool shouldSplitToDual = false;
 
-    if (KeyframeMarker("Camera", &isKeyframe, &interpolation, &tension))
+    if (KeyframeMarkerWithContextMenu("Camera", &isKeyframe, &interpolation, &tension, canSplitToDual, &shouldSplitToDual))
     {
         if (!isKeyframe)
         {
             // Keyframe was deleted
-            positionUniform.removeKeyframeAtTime(currentTime);
-            rotationUniform.removeKeyframeAtTime(currentTime);
+            positionUniform.removeKeyframeAtTime(currentTime, isEndKeyframe);
+            rotationUniform.removeKeyframeAtTime(currentTime, isEndKeyframe);
         }
         else
         {
             // Keyframe was added
-            positionUniform.setKeyframeAtTime(currentTime, getPositionValue(), interpolation, tension);
-            rotationUniform.setKeyframeAtTime(currentTime, getRotationValue(), interpolation, tension);
+            positionUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getPositionValue(), interpolation, tension);
+            rotationUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getRotationValue(), interpolation, tension);
+        }
+
+        if (shouldSplitToDual)
+        {
+            UniformValue splitPositionValue = isKeyframe ? kf->value : getPositionValue();
+            UniformKeyframe* rotationKf = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
+            UniformValue splitRotationValue = rotationKf != nullptr ? rotationKf->value : getRotationValue();
+
+            positionUniform.insertKeyframeAtTime(currentTime, true, splitPositionValue, interpolation, tension);
+            rotationUniform.insertKeyframeAtTime(currentTime, true, splitRotationValue, interpolation, tension);
         }
     }
 }

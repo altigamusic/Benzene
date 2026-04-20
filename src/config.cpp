@@ -158,7 +158,12 @@ UniformConfig loadConfig(const std::string& filename)
             KeyframeInterpolation interpolation = static_cast<KeyframeInterpolation>((int)keyframeJson["interpolation"]);
             float tension = keyframeJson["tension"];
 
-            newUniform.setKeyframeAtTime(time, value, interpolation, tension);
+            if (newUniform.countKeyframesAtTime(time) >= 2)
+            {
+                throw std::runtime_error("Cannot insert keyframe: already dual keyframe at time " + std::to_string(time));
+            }
+
+            newUniform.insertKeyframeAtTime(time, true, value, interpolation, tension);
         }
 
         if (newUniform.name == "_cp")
