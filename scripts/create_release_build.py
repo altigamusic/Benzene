@@ -4,6 +4,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import IntEnum
 import json
+import struct
 
 
 class InterpolationType(IntEnum):
@@ -143,7 +144,26 @@ def clamp_quantization_digits(digits) -> int:
 
 
 def get_shader_quantization_default(config: dict) -> int:
-    return clamp_quantization_digits(config.get("shaderQuantizationDigits", 8))
+    return clamp_quantization_digits(config.get("shaderQuantizationDigits", 6))
+
+
+def quantize_float_bytes(value: float, quantization_bytes: int) -> float:
+    """
+    Truncate the float to (2+quantization_bytes) bytes:
+    If quantization_bytes is 0, the float will have 2 bytes and its last 2 bytes will be zeroed.
+    If quantization_bytes is 1, the float will have 3 bytes and its last byte will be zeroed.
+    If quantization_bytes is 2 or more, the float will have 4 bytes and no quantization will be applied.
+    """
+    # Convert the float to binary representation
+    value_bytes = struct.unpack(">BBBB", struct.pack(">f", value))
+
+    # Zero out the last bytes according to the quantization level
+    quantized_bytes = value_bytes[: 2 + quantization_bytes] + (0, 0)
+    quantized_bytes = quantized_bytes[:4]  # Ensure we only have 4 bytes total
+
+    # Convert back to float
+    quantized_value = struct.unpack(">f", struct.pack(">BBBB", *quantized_bytes))[0]
+    return quantized_value
 
 
 def format_float_for_glsl(value: float, digits: int) -> str:
@@ -178,15 +198,26 @@ def uniform_to_const(uniform: Uniform, quantization_default_digits: int):
         keyframe_values = [0] * number_of_params(uniform)
 
     digits = uniform.quantization if uniform.quantization is not None else quantization_default_digits
-    digits = clamp_quantization_digits(digits)
     return Const(uniform.name, uniform.type, keyframe_values_to_const_value(uniform.type, keyframe_values, digits))
 
 
-def split_animated_and_const_uniforms(uniforms: list[Uniform], quantization_default_digits: int):
-    animated_uniforms = [uniform for uniform in uniforms if len(uniform.keyframes) > 1]
-    consts = [uniform for uniform in uniforms if len(uniform.keyframes) <= 1]
+def quantize_keyframe(keyframe: Keyframe, quantization_bytes: int):
+    quantized_values = [quantize_float_bytes(v, quantization_bytes) for v in keyframe.values]
+    return Keyframe(keyframe.time, quantized_values, keyframe.interpolation, keyframe.tension)
 
-    return animated_uniforms, [uniform_to_const(uniform, quantization_default_digits) for uniform in consts]
+
+def quantize_uniform(uniform: Uniform, quantization_default_digits: int):
+    quantization_bytes = uniform.quantization if uniform.quantization is not None else quantization_default_digits
+    quantized_keyframes = [quantize_keyframe(kf, quantization_bytes) for kf in uniform.keyframes]
+
+    return Uniform(uniform.name, uniform.type, quantized_keyframes, uniform.quantization)
+
+
+def split_animated_and_const_uniforms(uniforms: list[Uniform], quantization_default_digits: int):
+    animated_uniforms = [quantize_uniform(uniform, quantization_default_digits) for uniform in uniforms if len(uniform.keyframes) > 1]
+    consts = [uniform_to_const(uniform, quantization_default_digits) for uniform in uniforms if len(uniform.keyframes) <= 1]
+
+    return animated_uniforms, consts
 
 
 def generate_release_file_code(uniforms, include_tension: bool):

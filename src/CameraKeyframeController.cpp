@@ -146,6 +146,17 @@ void CameraKeyframeController::displayImGuiWindow()
         ImGui::TextColored(ImVec4(1, 0, 0, 1), "Camera is locked");
     }
 
+    int quantization = positionUniform.quantization.value_or(6);
+
+    ImGui::SetNextItemWidth(70);
+    if (ImGui::InputInt("Quantization", &quantization, 1, 0, ImGuiInputTextFlags_EnterReturnsTrue))
+    {
+        quantization = min(2, max(0, quantization));
+        positionUniform.quantization = quantization;
+        rotationUniform.quantization = quantization;
+        if (isLocked) moveCameraToKeyframe();
+    }
+
     ImGui::NewLine();
     ImGui::Text("WASD: Move camera");
     ImGui::Text("Q/E: Move camera up/down");
