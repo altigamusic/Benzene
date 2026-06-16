@@ -362,6 +362,32 @@ static bool renderMenuBar()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Edit"))
+    {
+        std::optional<std::string> undoString = actionHistory.describeUndo();
+        std::optional<std::string> redoString = actionHistory.describeRedo();
+
+        if (!undoString.has_value())
+        {
+            ImGui::MenuItem("Undo", "Ctrl-Z", false, false);
+        }
+        else if (ImGui::MenuItem(("Undo " + undoString.value()).c_str(), "Ctrl-Z"))
+        {
+            actionHistory.undo(editorState);
+        }
+
+        if (!redoString.has_value())
+        {
+            ImGui::MenuItem("Redo", "Ctrl-Y", false, false);
+        }
+        else if (ImGui::MenuItem(("Redo " + redoString.value()).c_str(), "Ctrl-Y"))
+        {
+            actionHistory.redo(editorState);
+        }
+
+        ImGui::EndMenu();
+    }
+
     ImGui::EndMenuBar();
 
     return didChange;
@@ -382,6 +408,10 @@ static bool handleKeyboard(const KeyboardState& keyboard, float& t)
     if (keyboard.wasKeyPressed(VK_F1)) showDemoWindow = true;
 
     if (keyboard.wasKeyPressed(VK_SPACE)) isPlaying = !isPlaying;
+
+    if (keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed('Z')) actionHistory.undo(editorState);
+
+    if (keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed('Y')) actionHistory.redo(editorState);
 
     if (handleKeyScrubbing(keyboard, t, isEndKeyframe, (int)editorState.config.lengthInBeats, editorState.config.uniformList,
             editorState.cameraController))

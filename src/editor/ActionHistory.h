@@ -2,6 +2,8 @@
 #include "Action.h"
 #include <deque>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 struct EditorState;
@@ -15,6 +17,8 @@ class ActionHistory
     void record(std::unique_ptr<Action> action);
     void undo(EditorState& state);
     void redo(EditorState& state);
+    std::optional<std::string> describeUndo();
+    std::optional<std::string> describeRedo();
 
   private:
     std::deque<std::unique_ptr<Action>> past;

@@ -37,3 +37,15 @@ void ActionHistory::redo(EditorState& state)
     action->invoke(state);
     pushToPast(std::move(action));
 }
+
+std::optional<std::string> ActionHistory::describeUndo()
+{
+    if (past.empty()) return std::nullopt;
+    return past.back()->describe();
+}
+
+std::optional<std::string> ActionHistory::describeRedo()
+{
+    if (future.empty()) return std::nullopt;
+    return future.back()->describe();
+}
