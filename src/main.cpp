@@ -29,18 +29,14 @@
 #include "editor/components/save_dialog.h"
 #include "editor/uniform_editor.h"
 #include "editor/timeline.h"
+#include "editor/EditorState.h"
+#include "editor/ActionHistory.h"
 
-CameraKeyframeController cameraController;
+EditorState editorState;
+ActionHistory actionHistory;
 const char* configFileName = "config.json";
 
-int releaseResolutionX;
-int releaseResolutionY;
-int shaderQuantizationDigits = 6;
-
 bool showDemoWindow;
-
-int demoTimeLength = 140;
-int bpm = 120;
 
 bool isAbLooping = false;
 float loopStartTime = 0.0f;
@@ -58,14 +54,10 @@ bool isEndKeyframe = true;
 KeyboardState keyboardState;
 MouseState mouseState;
 
-std::vector<Uniform> uniformList;
-
-std::vector<std::string> groups;
-std::string currentGroup;
-
 void updateUniforms(const float ftime)
 {
-    windowRenderer.updateUniforms(ftime, uniformList, cameraController, isEndKeyframe, shaderQuantizationDigits);
+    windowRenderer.updateUniforms(
+        ftime, editorState.config.uniformList, editorState.cameraController, isEndKeyframe, editorState.config.shaderQuantizationDigits);
 }
 
 #pragma region Window and Rendering Boilerplate
@@ -218,27 +210,22 @@ void loadConfigFromFile(const std::string& filename)
     try
     {
         BenzeneConfig cfg = loadConfig(filename);
-        uniformList = std::move(cfg.uniformList);
-        bpm = cfg.bpm;
-        releaseResolutionX = cfg.resolutionX;
-        releaseResolutionY = cfg.resolutionY;
-        shaderQuantizationDigits = cfg.shaderQuantizationDigits;
-        demoTimeLength = cfg.lengthInBeats;
-        loopEndTime = demoTimeLength; // Update loop end time when config is loaded
-        if (cfg.cameraPosition.has_value()) cameraController.positionUniform = cfg.cameraPosition.value();
-        if (cfg.cameraRotation.has_value()) cameraController.rotationUniform = cfg.cameraRotation.value();
         if (cfg.musicWavFile.has_value() && !cfg.musicWavFile->empty())
         {
             EditorMusic::LoadWavFile(cfg.musicWavFile->c_str());
         }
 
+        loopEndTime = cfg.lengthInBeats; // Update loop end time when config is loaded
+
         // Load groups
         std::set<std::string> groupSet;
-        for (const Uniform& u : uniformList)
+        for (const Uniform& u : cfg.uniformList)
         {
             if (!u.group.empty()) groupSet.insert(u.group);
         }
-        groups = std::vector<std::string>(groupSet.begin(), groupSet.end());
+        editorState.groups = std::vector<std::string>(groupSet.begin(), groupSet.end());
+
+        editorState.fromConfig(std::move(cfg));
     }
     catch (const std::exception& e)
     {
@@ -251,12 +238,10 @@ void saveConfigToFile(const std::string& filename)
     try
     {
         const char* loadedMusicPath = EditorMusic::GetLoadedFilePath();
-        std::optional<std::string> musicPath =
+        BenzeneConfig cfg = editorState.toConfig();
+        cfg.musicWavFile =
             (loadedMusicPath != nullptr && loadedMusicPath[0] != '\0') ? std::optional<std::string>(loadedMusicPath) : std::nullopt;
-
-        BenzeneConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, shaderQuantizationDigits,
-            uniformList, cameraController.positionUniform, cameraController.rotationUniform, musicPath};
-        saveConfig(config, filename);
+        saveConfig(cfg, filename);
     }
     catch (const std::exception& e)
     {
@@ -271,19 +256,19 @@ void renderSettingsWindow()
     ImGui::Text("Resolution: ");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    ImGui::InputInt(" x ##xres", &releaseResolutionX, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::InputInt(" x ##xres", &editorState.config.resolutionX, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    ImGui::InputInt("##yres", &releaseResolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::InputInt("##yres", &editorState.config.resolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
     ImGui::SeparatorText("Shader Quantization");
 
     ImGui::Text("Default digits:");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(60);
-    if (ImGui::InputInt("##shaderQuantDefault", &shaderQuantizationDigits, 1, 0, ImGuiInputTextFlags_EnterReturnsTrue))
+    if (ImGui::InputInt("##shaderQuantDefault", &editorState.config.shaderQuantizationDigits, 1, 0, ImGuiInputTextFlags_EnterReturnsTrue))
     {
-        if (shaderQuantizationDigits < 0) shaderQuantizationDigits = 0;
+        if (editorState.config.shaderQuantizationDigits < 0) editorState.config.shaderQuantizationDigits = 0;
     }
 
     ImGui::End();
@@ -298,14 +283,14 @@ static bool renderToolbar(float& t, WININFO* info)
 {
     bool shouldRerender = false;
 
-    if (ImGui::Button("Prev") && scrubToPreviousKeyframe(t, isEndKeyframe, uniformList, cameraController))
+    if (ImGui::Button("Prev") && scrubToPreviousKeyframe(t, isEndKeyframe, editorState.config.uniformList, editorState.cameraController))
     {
         isPlaying = false;
         shouldRerender = true;
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Next") && scrubToNextKeyframe(t, isEndKeyframe, uniformList, cameraController))
+    if (ImGui::Button("Next") && scrubToNextKeyframe(t, isEndKeyframe, editorState.config.uniformList, editorState.cameraController))
     {
         isPlaying = false;
         shouldRerender = true;
@@ -322,17 +307,21 @@ static bool renderToolbar(float& t, WININFO* info)
     ImGui::Text("BPM:");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    ImGui::DragInt("##BPM", &bpm, 1.0f, 10, 5000);
+    int bpmInt = (int)editorState.config.bpm;
+    if (ImGui::DragInt("##BPM", &bpmInt, 1.0f, 10, 5000)) editorState.config.bpm = (float)bpmInt;
 
     ImGui::SameLine(0, 50);
     ImGui::Text("Length:");
 
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
+    int demoTimeLength = (int)editorState.config.lengthInBeats;
     int prevDemoTimeLength = demoTimeLength;
-    ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
-
-    if (demoTimeLength != prevDemoTimeLength && loopEndTime > demoTimeLength) loopEndTime = demoTimeLength;
+    if (ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX))
+    {
+        editorState.config.lengthInBeats = (float)demoTimeLength;
+        if (loopEndTime > demoTimeLength) loopEndTime = (float)demoTimeLength;
+    }
 
     ImGui::SameLine(0, 50);
     ImGui::Checkbox("Loop Segment", &isAbLooping);
@@ -358,7 +347,7 @@ static bool renderMenuBar()
         if (ImGui::MenuItem("Reload Uniforms From File"))
         {
             loadConfigFromFile(configFileName);
-            windowRenderer.reload(uniformList, currentGroup);
+            windowRenderer.reload(editorState.config.uniformList, editorState.currentGroup);
             didChange = true;
         }
         if (ImGui::MenuItem("Save Uniforms"))
@@ -394,7 +383,8 @@ static bool handleKeyboard(const KeyboardState& keyboard, float& t)
 
     if (keyboard.wasKeyPressed(VK_SPACE)) isPlaying = !isPlaying;
 
-    if (handleKeyScrubbing(keyboard, t, isEndKeyframe, demoTimeLength, uniformList, cameraController))
+    if (handleKeyScrubbing(keyboard, t, isEndKeyframe, (int)editorState.config.lengthInBeats, editorState.config.uniformList,
+            editorState.cameraController))
     {
         isPlaying = false;
         shouldRerender = true;
@@ -432,11 +422,11 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         return 0;
     }
 
-    cameraController.recalculateCameraTarget();
+    editorState.cameraController.recalculateCameraTarget();
     loadConfigFromFile(configFileName);
 
     float timelineViewStart = 0.0f;
-    float timelineViewEnd = demoTimeLength;
+    float timelineViewEnd = editorState.config.lengthInBeats;
 
     long long prevSystemTime = timeGetTime();
     long long playStartSystemTime = prevSystemTime;
@@ -459,7 +449,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (playStartSystemTime > 0)
         {
             long playTimeMs = currentSystemTime - playStartSystemTime;
-            float playTimeBeats = msToBeats(playTimeMs, bpm);
+            float playTimeBeats = msToBeats(playTimeMs, editorState.config.bpm);
             timeInBeats = playStartTime + playTimeBeats;
 
             if (isAbLooping && loopEndTime > loopStartTime)
@@ -468,10 +458,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
                 timeInBeats = fmodf(timeInBeats - loopStartTime, loopEndTime - loopStartTime) + loopStartTime;
             else
-                timeInBeats = fmodf(timeInBeats, demoTimeLength);
+                timeInBeats = fmodf(timeInBeats, editorState.config.lengthInBeats);
         }
 
-        cameraController.startFrame(timeInBeats, isEndKeyframe);
+        editorState.cameraController.startFrame(timeInBeats, isEndKeyframe);
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
@@ -490,7 +480,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (showSettingsWindow) renderSettingsWindow();
         debugWindow.render();
 
-        cameraController.updateCamera(timeDeltaMs, keyboardState, mouseState);
+        editorState.cameraController.updateCamera(timeDeltaMs, keyboardState, mouseState);
 
         bool shouldRerender = isPlaying;
 
@@ -503,8 +493,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         shouldRerender |= renderToolbar(timeInBeats, info);
 
-        if (renderTimelines(timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, uniformList, cameraController, currentGroup,
-                demoTimeLength, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
+        if (renderTimelines(timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, editorState.config.uniformList,
+                editorState.cameraController, editorState.currentGroup, editorState.config.lengthInBeats,
+                isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
         {
             shouldRerender = true;
             frames = -1;
@@ -526,14 +517,14 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (renderMenuBar()) shouldRerender = true;
 
         bool shouldReloadFragmentShader = false;
-        if (renderAndUpdateUniforms(timeInBeats, isEndKeyframe, isPlaying, shouldReloadFragmentShader, uniformList, groups, currentGroup,
+        if (renderAndUpdateUniforms(timeInBeats, isEndKeyframe, isPlaying, shouldReloadFragmentShader, editorState, actionHistory,
                 windowRenderer.sidebarHeight)) // The function will pause if necessary
             shouldRerender = true;
 
-        if (shouldReloadFragmentShader) windowRenderer.reload(uniformList, currentGroup);
+        if (shouldReloadFragmentShader) windowRenderer.reload(editorState.config.uniformList, editorState.currentGroup);
 
-        cameraController.displayImGuiWindow();
-        shouldRerender |= cameraController.didCameraMove();
+        editorState.cameraController.displayImGuiWindow();
+        shouldRerender |= editorState.cameraController.didCameraMove();
 
         int fpsT = currentSystemTime - fpsStartSystemTime;
         ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetTextLineHeightWithSpacing() * 2);
@@ -548,10 +539,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::End();
 
         // Try reloading the file
-        bool didReload = windowRenderer.reloadFromFile(uniformList, currentGroup);
+        bool didReload = windowRenderer.reloadFromFile(editorState.config.uniformList, editorState.currentGroup);
         shouldRerender |= didReload;
 
-        EditorMusic::Update(isPlaying && shouldPlayMusic, timeInBeats, static_cast<float>(bpm));
+        EditorMusic::Update(isPlaying && shouldPlayMusic, timeInBeats, editorState.config.bpm);
 
         if (prevShouldRerender && !shouldRerender)
         {

@@ -2,6 +2,7 @@
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_benzene_widgets.h"
 #include "components/keyframe_marker.h"
+#include "actions/ChangeUniformValue.h"
 #include <algorithm>
 
 std::optional<std::string> nameDialog(const char* str_id)
@@ -32,11 +33,24 @@ std::optional<std::string> nameDialog(const char* str_id)
     return result;
 }
 
-bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyframe, bool& shouldKeepPlaying,
-    bool& outShouldReloadFragmentShader, std::vector<Uniform>& uniformList, const std::vector<std::string>& groups)
+struct ActiveDragInfo
 {
+    std::string uniformName;
+    std::optional<UniformKeyframe> beforeKeyframe;
+    float targetTime;
+    bool targetIsEnd;
+};
+
+bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyframe, bool& shouldKeepPlaying,
+    bool& outShouldReloadFragmentShader, EditorState& editorState, ActionHistory& actionHistory)
+{
+    std::vector<Uniform>& uniformList = editorState.config.uniformList;
+    const std::vector<std::string>& groups = editorState.groups;
+
     bool didAnythingChange = false;
     outShouldReloadFragmentShader = false;
+
+    static std::optional<ActiveDragInfo> activeDrag;
 
     auto uniformToDelete = uniformList.end();
 
@@ -49,6 +63,15 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
         UniformValue value = uniform.valueAtTime(time, isEndKeyframe);
         bool didThisUniformChange = false;
         UniformKeyframe* keyframeAtCurrentTime = uniform.getKeyframeAtTime(time, isEndKeyframe);
+
+        float lastKeyframeTime = uniform.keyframes.empty() ? 0 : uniform.keyframes.back().time;
+        bool isBeyondLastKeyframe = time > lastKeyframeTime;
+        float targetTime = isBeyondLastKeyframe ? lastKeyframeTime : time;
+        bool targetIsEnd = isBeyondLastKeyframe ? true : isEndKeyframe;
+        UniformKeyframe* targetKeyframe = uniform.getKeyframeAtTime(targetTime, targetIsEnd);
+
+        bool itemActivated = false;
+        bool itemDeactivated = false;
 
         switch (uniform.type)
         {
@@ -72,6 +95,13 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
             didThisUniformChange = ImGui::ColorEdit3(uniform.name.c_str(), value.v3);
             break;
         }
+
+        itemActivated |= ImGui::IsItemActivated();
+        itemDeactivated |= ImGui::IsItemDeactivatedAfterEdit();
+
+        if (itemActivated)
+            activeDrag = ActiveDragInfo{
+                uniform.name, targetKeyframe ? std::optional<UniformKeyframe>(*targetKeyframe) : std::nullopt, targetTime, targetIsEnd};
 
         int uniformTypeIndex = uniform.type == UniformType::Float   ? 0
                                : uniform.type == UniformType::Vec2  ? 1
@@ -168,9 +198,6 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
             shouldKeepPlaying = false;
         }
 
-        float lastKeyframeTime = uniform.keyframes.empty() ? 0 : uniform.keyframes.back().time;
-        bool isBeyondLastKeyframe = time > lastKeyframeTime;
-
         // Set a keyframe if the uniform changed *only if* it's before another keyframe!
         // This is because if it's after the last one, it's more natural to just update the last keyframe value instead.
         // However, if we're between two keyframes, we don't know which keyframe the user would want to change, or how to interpolate the
@@ -199,6 +226,17 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
             uniform.removeKeyframeAtTime(time, isEndKeyframe);
             didAnythingChange = true;
         }
+
+        if (itemDeactivated && activeDrag.has_value() && activeDrag->uniformName == uniform.name)
+        {
+            UniformKeyframe* finalKeyframe = uniform.getKeyframeAtTime(activeDrag->targetTime, activeDrag->targetIsEnd);
+            if (finalKeyframe)
+            {
+                actionHistory.record(std::make_unique<ChangeUniformValue>(uniform.name, activeDrag->targetTime, activeDrag->targetIsEnd,
+                    activeDrag->beforeKeyframe, finalKeyframe->value, finalKeyframe->interpolation, finalKeyframe->interpolationFactor));
+            }
+            activeDrag.reset();
+        }
     }
 
     if (uniformToDelete != uniformList.end())
@@ -211,9 +249,9 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
 }
 
 bool renderAndUpdateUniforms(float time, bool isEndKeyframe, bool& shouldKeepPlaying, bool& outShouldReloadFragmentShader,
-    std::vector<Uniform>& uniformList, std::vector<std::string>& groups, std::string& currentGroup, int sidebarHeight)
+    EditorState& editorState, ActionHistory& actionHistory, int sidebarHeight)
 {
-    if (uniformList.empty()) return false;
+    if (editorState.config.uniformList.empty()) return false;
 
     bool didAnythingChange = false;
     outShouldReloadFragmentShader = false;
@@ -231,26 +269,26 @@ bool renderAndUpdateUniforms(float time, bool isEndKeyframe, bool& shouldKeepPla
     if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) ImGui::OpenPopup("Add Group Name");
 
     auto result = nameDialog("Add Group Name");
-    if (result.has_value()) groups.push_back(result.value());
+    if (result.has_value()) editorState.groups.push_back(result.value());
 
     static int currentlyRenamedGroup = -1;
 
     if (ImGui::BeginTabItem("Unsorted"))
     {
-        currentGroup = "";
+        editorState.currentGroup = "";
         didAnythingChange |=
-            renderSingleUniformTab("", time, isEndKeyframe, shouldKeepPlaying, outShouldReloadFragmentShader, uniformList, groups);
+            renderSingleUniformTab("", time, isEndKeyframe, shouldKeepPlaying, outShouldReloadFragmentShader, editorState, actionHistory);
         ImGui::EndTabItem();
     }
 
-    for (int i = 0; i < (int)groups.size(); i++)
+    for (int i = 0; i < (int)editorState.groups.size(); i++)
     {
-        std::string group = groups[i];
+        std::string group = editorState.groups[i];
         bool openRenameDialog = false;
 
         if (ImGui::BeginTabItem(group.c_str()))
         {
-            currentGroup = group;
+            editorState.currentGroup = group;
 
             if (ImGui::BeginPopupContextItem())
             {
@@ -267,7 +305,8 @@ bool renderAndUpdateUniforms(float time, bool isEndKeyframe, bool& shouldKeepPla
             }
 
             bool tabNeedsReload = false;
-            didAnythingChange |= renderSingleUniformTab(group, time, isEndKeyframe, shouldKeepPlaying, tabNeedsReload, uniformList, groups);
+            didAnythingChange |=
+                renderSingleUniformTab(group, time, isEndKeyframe, shouldKeepPlaying, tabNeedsReload, editorState, actionHistory);
             outShouldReloadFragmentShader |= tabNeedsReload;
 
             ImGui::EndTabItem();
@@ -281,12 +320,12 @@ bool renderAndUpdateUniforms(float time, bool isEndKeyframe, bool& shouldKeepPla
 
     if (result.has_value())
     {
-        for (Uniform& uniform : uniformList)
+        for (Uniform& uniform : editorState.config.uniformList)
         {
-            if (uniform.group == groups[currentlyRenamedGroup]) uniform.group = result.value();
+            if (uniform.group == editorState.groups[currentlyRenamedGroup]) uniform.group = result.value();
         }
 
-        groups[currentlyRenamedGroup] = result.value();
+        editorState.groups[currentlyRenamedGroup] = result.value();
         currentlyRenamedGroup = -1;
     }
 

@@ -169,11 +169,11 @@ bool handleKeyScrubbing(const KeyboardState& keyboard, float& timeInBeats, bool&
 }
 
 bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
-    CameraKeyframeController& cameraController, const std::string& currentGroup, int demoTimeLength, float* loopStart, float* loopEnd)
+    CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, float* loopStart, float* loopEnd)
 {
     bool didChange = false;
 
-    ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, (float)demoTimeLength);
+    ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
     didChange |= TimeSlider("Time", &timeInBeats, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
 
     if (cameraController.positionUniform.keyframes.size() > 1)
