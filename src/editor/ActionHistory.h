@@ -19,6 +19,7 @@ class ActionHistory
     void redo(EditorState& state);
     std::optional<std::string> describeUndo();
     std::optional<std::string> describeRedo();
+    Action* peekPast();
 
   private:
     std::deque<std::unique_ptr<Action>> past;

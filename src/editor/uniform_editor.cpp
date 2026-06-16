@@ -3,6 +3,14 @@
 #include "../imgui/imgui_benzene_widgets.h"
 #include "components/keyframe_marker.h"
 #include "actions/ChangeUniformValue.h"
+#include "actions/DeleteKeyframe.h"
+#include "actions/SplitKeyframeToDual.h"
+#include "actions/DeleteUniform.h"
+#include "actions/ChangeUniformType.h"
+#include "actions/ChangeUniformGroup.h"
+#include "actions/ChangeUniformQuantization.h"
+#include "actions/AddUniformGroup.h"
+#include "actions/RenameUniformGroup.h"
 #include <algorithm>
 
 std::optional<std::string> nameDialog(const char* str_id)
@@ -52,7 +60,7 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
 
     static std::optional<ActiveDragInfo> activeDrag;
 
-    auto uniformToDelete = uniformList.end();
+    std::optional<std::string> uniformNameToDelete;
 
     for (auto uniformIt = uniformList.begin(); uniformIt != uniformList.end(); ++uniformIt)
     {
@@ -115,25 +123,27 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
         {
             if (ImGui::Combo("Type", &uniformTypeIndex, items, 3))
             {
+                UniformType newType = uniform.type;
                 switch (uniformTypeIndex)
                 {
                 case 0:
-                    uniform.type = UniformType::Float;
+                    newType = UniformType::Float;
                     break;
                 case 1:
-                    uniform.type = UniformType::Vec2;
+                    newType = UniformType::Vec2;
                     break;
                 case 2:
-                    uniform.type = UniformType::Color;
+                    newType = UniformType::Color;
                     break;
                 default:
                     break;
                 }
 
                 // Don't activate didThisUniformChange here so a keyframe won't be created
+                actionHistory.execute(
+                    std::make_unique<ChangeUniformType>(uniform.name, uniform.type, uniform.keyframes, newType), editorState);
                 didAnythingChange = true;
                 outShouldReloadFragmentShader = true;
-                uniform.keyframes.clear();
             }
 
             int uniformGroupIndex = uniform.group.empty() ? 0 : std::find(groups.begin(), groups.end(), uniform.group) - groups.begin() + 1;
@@ -147,11 +157,8 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
 
             if (ImGui::Combo("Group", &uniformGroupIndex, groupItems.data(), groupItems.size()))
             {
-                if (uniformGroupIndex == 0) // No group
-                    uniform.group.clear();
-                else
-                    uniform.group = groups[uniformGroupIndex - 1];
-
+                std::string afterGroup = uniformGroupIndex == 0 ? std::string() : groups[uniformGroupIndex - 1];
+                actionHistory.execute(std::make_unique<ChangeUniformGroup>(uniform.name, uniform.group, afterGroup), editorState);
                 didAnythingChange = true;
             }
 
@@ -160,22 +167,20 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
 
             if (ImGui::Combo("Quantization", &quantizationIndex, quantizationItems, 8))
             {
-                if (quantizationIndex == 0)
-                    uniform.quantization.reset();
-                else
-                    uniform.quantization = quantizationIndex - 1;
-
+                std::optional<int> afterQuantization = quantizationIndex == 0 ? std::nullopt : std::optional<int>(quantizationIndex - 1);
+                actionHistory.execute(
+                    std::make_unique<ChangeUniformQuantization>(uniform.name, uniform.quantization, afterQuantization), editorState);
                 didAnythingChange = true;
             }
 
             if (ImGui::Selectable("Delete"))
             {
-                uniformToDelete = uniformIt;
-                ImGui::End();
+                uniformNameToDelete = uniform.name;
+                ImGui::EndPopup();
                 continue;
             }
 
-            ImGui::End();
+            ImGui::EndPopup();
         }
 
         bool hasKeyframeAtCurrentTime = keyframeAtCurrentTime != nullptr;
@@ -193,7 +198,9 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
 
         if (shouldSplitToDual && keyframeAtCurrentTime != nullptr)
         {
-            uniform.insertKeyframeAtTime(time, true, keyframeAtCurrentTime->value, interpolation, tension);
+            actionHistory.execute(
+                std::make_unique<SplitKeyframeToDual>(uniform.name, time, keyframeAtCurrentTime->value, interpolation, tension),
+                editorState);
             didAnythingChange = true;
             shouldKeepPlaying = false;
         }
@@ -211,7 +218,20 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
 
         if (shouldSetKeyframe)
         {
-            uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
+            if (shouldSetKeyframeDueToMarkerChange && !shouldSetKeyframeDueToUniformChange)
+            {
+                // Marker-driven changes (toggling the keyframe on, changing interpolation/tension) are discrete,
+                // single-frame events - record them immediately rather than relying on the value-widget's drag tracking below.
+                std::optional<UniformKeyframe> before =
+                    keyframeAtCurrentTime ? std::optional<UniformKeyframe>(*keyframeAtCurrentTime) : std::nullopt;
+                uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
+                // actionHistory.record(
+                //     std::make_unique<ChangeUniformValue>(uniform.name, time, isEndKeyframe, before, value, interpolation, tension));
+            }
+            else
+            {
+                uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
+            }
             didAnythingChange = true;
             shouldKeepPlaying = false; // Pause only if a keyframe was created, no other reason
         }
@@ -223,7 +243,7 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
         else if (shouldRemoveKeyframe)
         {
             // Remove the keyframe at the current time
-            uniform.removeKeyframeAtTime(time, isEndKeyframe);
+            actionHistory.execute(std::make_unique<DeleteKeyframe>(uniform.name, time, isEndKeyframe, *keyframeAtCurrentTime), editorState);
             didAnythingChange = true;
         }
 
@@ -239,9 +259,10 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
         }
     }
 
-    if (uniformToDelete != uniformList.end())
+    if (uniformNameToDelete.has_value())
     {
-        uniformList.erase(uniformToDelete);
+        Uniform* uniformToDelete = editorState.findUniform(*uniformNameToDelete);
+        if (uniformToDelete) actionHistory.execute(std::make_unique<DeleteUniform>(*uniformToDelete), editorState);
         outShouldReloadFragmentShader = true;
     }
 
@@ -269,7 +290,7 @@ bool renderAndUpdateUniforms(float time, bool isEndKeyframe, bool& shouldKeepPla
     if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) ImGui::OpenPopup("Add Group Name");
 
     auto result = nameDialog("Add Group Name");
-    if (result.has_value()) editorState.groups.push_back(result.value());
+    if (result.has_value()) actionHistory.execute(std::make_unique<AddUniformGroup>(result.value()), editorState);
 
     static int currentlyRenamedGroup = -1;
 
@@ -320,12 +341,7 @@ bool renderAndUpdateUniforms(float time, bool isEndKeyframe, bool& shouldKeepPla
 
     if (result.has_value())
     {
-        for (Uniform& uniform : editorState.config.uniformList)
-        {
-            if (uniform.group == editorState.groups[currentlyRenamedGroup]) uniform.group = result.value();
-        }
-
-        editorState.groups[currentlyRenamedGroup] = result.value();
+        actionHistory.execute(std::make_unique<RenameUniformGroup>(editorState.groups[currentlyRenamedGroup], result.value()), editorState);
         currentlyRenamedGroup = -1;
     }
 

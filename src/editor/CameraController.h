@@ -90,7 +90,11 @@ class CameraController
 
     void moveUp(float amount);
 
-    void updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse);
+    /// <summary>
+    /// Update the camera movement according to the keyboard and mouse.
+    /// Returns true if the camera was moved and false otherwise.
+    /// </summary>
+    bool updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse);
 
     void resetCameraMovementCheck();
     void markAsMoved();

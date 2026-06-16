@@ -13,4 +13,5 @@ struct EditorState
 
     BenzeneConfig toConfig() const;
     void fromConfig(BenzeneConfig config);
+    Uniform* findUniform(const std::string& name);
 };

@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+class ActionHistory;
+
 bool scrubToPreviousKeyframe(
     float& t, bool& isEndKeyframe, const std::vector<Uniform>& uniformList, const CameraKeyframeController& cameraController);
 
@@ -27,9 +29,10 @@ bool handleKeyScrubbing(const KeyboardState& keyboard, float& t, bool& isEndKeyf
 /// <param name="cameraController">The camera keyframe controller whose keyframes are rendered and edited.</param>
 /// <param name="currentGroup">The currently selected uniform group to display timelines for.</param>
 /// <param name="demoTimeLength">The total length of the demo, in beats.</param>
+/// <param name="actionHistory">The action history to record keyframe-move actions into, for undo/redo.</param>
 /// <param name="loopStart">The start of the loop, nullptr if there's no loop. Modified if the user moves the loop points.</param>
 /// <param name="loopEnd">The end of the loop, nullptr if there's no loop. Modified if the user moves the loop points.</param>
 /// <returns>True if the time has changed from user input, false if nothing was altered.</returns>
 bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
-    CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, float* loopStart = nullptr,
-    float* loopEnd = nullptr);
+    CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, ActionHistory& actionHistory,
+    float* loopStart = nullptr, float* loopEnd = nullptr);

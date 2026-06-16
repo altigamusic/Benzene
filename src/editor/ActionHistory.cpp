@@ -49,3 +49,5 @@ std::optional<std::string> ActionHistory::describeRedo()
     if (future.empty()) return std::nullopt;
     return future.back()->describe();
 }
+
+Action* ActionHistory::peekPast() { return past.empty() ? nullptr : past.back().get(); }

@@ -68,6 +68,54 @@
     <ClCompile Include="src\editor\components\save_dialog.cpp">
       <Filter>Editor\Components</Filter>
     </ClCompile>
+    <ClCompile Include="src\editor\ActionHistory.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\AddUniformGroup.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\ChangeCameraKeyframe.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\ChangeUniformGroup.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\ChangeUniformQuantization.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\ChangeUniformType.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\ChangeUniformValue.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\DeleteCameraKeyframe.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\DeleteKeyframe.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\DeleteUniform.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\EditorState.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\SplitKeyframeToDual.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\RenameUniformGroup.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\SplitCameraKeyframeToDual.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\MoveKeyframe.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\MoveCameraKeyframe.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ext.h" />
@@ -160,6 +208,9 @@
     </Filter>
     <Filter Include="Editor\Components">
       <UniqueIdentifier>{e700f37d-17ac-49d1-9975-e923455411c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor\Actions">
+      <UniqueIdentifier>{812f2ba3-41a3-4545-a0f5-809bd4ddea20}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

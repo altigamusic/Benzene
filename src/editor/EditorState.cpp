@@ -1,4 +1,11 @@
 #include "EditorState.h"
+#include <algorithm>
+
+Uniform* EditorState::findUniform(const std::string& name)
+{
+    auto it = std::find_if(config.uniformList.begin(), config.uniformList.end(), [&](const Uniform& u) { return u.name == name; });
+    return it != config.uniformList.end() ? &*it : nullptr;
+}
 
 BenzeneConfig EditorState::toConfig() const
 {

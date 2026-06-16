@@ -1,8 +1,13 @@
 #include "timeline.h"
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_benzene_widgets.h"
+#include "ActionHistory.h"
+#include "actions/MoveKeyframe.h"
+#include "actions/MoveCameraKeyframe.h"
 #include <algorithm>
 #include <cmath>
+#include <optional>
+#include <string>
 
 static std::vector<int> getAllKeyframes(const std::vector<Uniform>& uniformList, const CameraKeyframeController& cameraController)
 {
@@ -168,10 +173,51 @@ bool handleKeyScrubbing(const KeyboardState& keyboard, float& timeInBeats, bool&
     return false;
 }
 
+namespace
+{
+struct ActiveCameraKeyframeMove
+{
+    UniformKeyframe positionKeyframe;
+    UniformKeyframe rotationKeyframe;
+    float newTime;
+    bool isBeforeEnd;
+    bool isAfterEnd;
+};
+
+struct ActiveUniformKeyframeMove
+{
+    std::string uniformName;
+    UniformKeyframe keyframe;
+    float newTime;
+    bool isBeforeEnd;
+    bool isAfterEnd;
+};
+
+// A keyframe at this index is the "end" half of a dual keyframe if the previous entry shares its time.
+bool isEndHalfOfDual(int index, const std::vector<float>& keyframeTimes)
+{
+    return index > 0 && keyframeTimes[index - 1] == keyframeTimes[index];
+}
+
+// Determines whether the dragged keyframe (originally at keyframeTimes[index]) lands as the "end" half of a dual
+// keyframe once moved to newTime - true if it merges onto the previous keyframe, false if it merges onto the next
+// keyframe or doesn't merge with anything at all.
+bool isEndHalfOfDualAfterMove(int index, float newTime, const std::vector<float>& keyframeTimes)
+{
+    if (index > 0 && keyframeTimes[index - 1] == newTime) return true;
+    if (index < (int)keyframeTimes.size() - 1 && keyframeTimes[index + 1] == newTime) return false;
+    return false;
+}
+} // namespace
+
 bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
-    CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, float* loopStart, float* loopEnd)
+    CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, ActionHistory& actionHistory,
+    float* loopStart, float* loopEnd)
 {
     bool didChange = false;
+
+    static std::optional<ActiveCameraKeyframeMove> activeCameraKeyframeMove;
+    static std::optional<ActiveUniformKeyframeMove> activeUniformKeyframeMove;
 
     ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
     didChange |= TimeSlider("Time", &timeInBeats, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
@@ -186,17 +232,53 @@ bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& i
             keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
-        if (KeyframeSlider("Camera", &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
+        bool sliderChanged = KeyframeSlider("Camera", &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement);
+
+        if (kfMovement.index >= 0)
         {
-            if (kfMovement.index >= 0)
+            if (!activeCameraKeyframeMove.has_value())
+            {
+                const UniformKeyframe& posKf = cameraController.positionUniform.keyframes[kfMovement.index];
+
+                bool isBeforeEnd = isEndHalfOfDual(kfMovement.index, keyframes);
+
+                UniformKeyframe rotKf;
+                if (kfMovement.index < (int)cameraController.rotationUniform.keyframes.size())
+                {
+                    rotKf = cameraController.rotationUniform.keyframes[kfMovement.index];
+                }
+                else
+                {
+                    rotKf.time = posKf.time;
+                    rotKf.value = cameraController.rotationUniform.valueAtTime(posKf.time, isBeforeEnd);
+                    rotKf.interpolation = KeyframeInterpolation::Linear;
+                    rotKf.interpolationFactor = 0.0f;
+                }
+
+                activeCameraKeyframeMove = ActiveCameraKeyframeMove{posKf, rotKf, posKf.time, isBeforeEnd, isBeforeEnd};
+            }
+
+            if (sliderChanged)
             {
                 float newTime = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
 
                 cameraController.positionUniform.keyframes[kfMovement.index].time = newTime;
                 cameraController.rotationUniform.keyframes[kfMovement.index].time = newTime;
-            }
+                activeCameraKeyframeMove->newTime = newTime;
+                activeCameraKeyframeMove->isAfterEnd = isEndHalfOfDualAfterMove(kfMovement.index, newTime, keyframes);
 
-            didChange = true;
+                didChange = true;
+            }
+        }
+        else if (activeCameraKeyframeMove.has_value())
+        {
+            if (activeCameraKeyframeMove->newTime != activeCameraKeyframeMove->positionKeyframe.time)
+            {
+                actionHistory.record(std::make_unique<MoveCameraKeyframe>(activeCameraKeyframeMove->positionKeyframe,
+                    activeCameraKeyframeMove->rotationKeyframe, activeCameraKeyframeMove->newTime, activeCameraKeyframeMove->isBeforeEnd,
+                    activeCameraKeyframeMove->isAfterEnd));
+            }
+            activeCameraKeyframeMove.reset();
         }
     }
 
@@ -212,12 +294,34 @@ bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& i
 
         KeyframeMovementData kfMovement;
 
-        if (KeyframeSlider(uniform.name.c_str(), &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
-        {
-            if (kfMovement.index >= 0)
-                uniform.keyframes[kfMovement.index].time = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
+        bool sliderChanged = KeyframeSlider(uniform.name.c_str(), &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement);
 
-            didChange = true;
+        if (kfMovement.index >= 0)
+        {
+            if (!activeUniformKeyframeMove.has_value())
+            {
+                const UniformKeyframe& kf = uniform.keyframes[kfMovement.index];
+                bool isBeforeEnd = isEndHalfOfDual(kfMovement.index, keyframes);
+                activeUniformKeyframeMove = ActiveUniformKeyframeMove{uniform.name, kf, kf.time, isBeforeEnd, isBeforeEnd};
+            }
+
+            if (sliderChanged)
+            {
+                float newTime = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
+                uniform.keyframes[kfMovement.index].time = newTime;
+                activeUniformKeyframeMove->newTime = newTime;
+                activeUniformKeyframeMove->isAfterEnd = isEndHalfOfDualAfterMove(kfMovement.index, newTime, keyframes);
+                didChange = true;
+            }
+        }
+        else if (activeUniformKeyframeMove.has_value() && activeUniformKeyframeMove->uniformName == uniform.name)
+        {
+            if (activeUniformKeyframeMove->newTime != activeUniformKeyframeMove->keyframe.time)
+            {
+                actionHistory.record(std::make_unique<MoveKeyframe>(uniform.name, activeUniformKeyframeMove->keyframe,
+                    activeUniformKeyframeMove->newTime, activeUniformKeyframeMove->isBeforeEnd, activeUniformKeyframeMove->isAfterEnd));
+            }
+            activeUniformKeyframeMove.reset();
         }
     }
 

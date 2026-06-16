@@ -520,7 +520,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         if (showSettingsWindow) renderSettingsWindow();
         debugWindow.render();
 
-        editorState.cameraController.updateCamera(timeDeltaMs, keyboardState, mouseState);
+        editorState.cameraController.updateCamera(timeDeltaMs, keyboardState, mouseState, actionHistory);
 
         bool shouldRerender = isPlaying;
 
@@ -534,7 +534,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         shouldRerender |= renderToolbar(timeInBeats, info);
 
         if (renderTimelines(timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, editorState.config.uniformList,
-                editorState.cameraController, editorState.currentGroup, editorState.config.lengthInBeats,
+                editorState.cameraController, editorState.currentGroup, editorState.config.lengthInBeats, actionHistory,
                 isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
         {
             shouldRerender = true;
@@ -563,7 +563,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         if (shouldReloadFragmentShader) windowRenderer.reload(editorState.config.uniformList, editorState.currentGroup);
 
-        editorState.cameraController.displayImGuiWindow();
+        editorState.cameraController.displayImGuiWindow(actionHistory);
         shouldRerender |= editorState.cameraController.didCameraMove();
 
         int fpsT = currentSystemTime - fpsStartSystemTime;

@@ -3,6 +3,8 @@
 #include "CameraController.h"
 #include "uniform.h"
 
+class ActionHistory;
+
 class CameraKeyframeController
 {
   private:
@@ -12,7 +14,7 @@ class CameraKeyframeController
     bool shouldDisplayLockWarning = false;
     bool isEndKeyframe = false;
 
-    void displayKeyframeMarker();
+    void displayKeyframeMarker(ActionHistory& actionHistory);
     UniformValue getPositionValue();
     UniformValue getRotationValue();
     void moveCameraToKeyframe();
@@ -20,8 +22,8 @@ class CameraKeyframeController
   public:
     CameraKeyframeController();
     void startFrame(float currentTime, bool isEnd);
-    void displayImGuiWindow();
-    void updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse);
+    void displayImGuiWindow(ActionHistory& actionHistory);
+    void updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse, ActionHistory& actionHistory);
 
     void recalculateCameraTarget();
     void forceMovement();
