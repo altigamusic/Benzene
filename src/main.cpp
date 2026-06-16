@@ -374,6 +374,7 @@ static bool renderMenuBar()
         else if (ImGui::MenuItem(("Undo " + undoString.value()).c_str(), "Ctrl-Z"))
         {
             actionHistory.undo(editorState);
+            didChange = true;
         }
 
         if (!redoString.has_value())
@@ -383,6 +384,7 @@ static bool renderMenuBar()
         else if (ImGui::MenuItem(("Redo " + redoString.value()).c_str(), "Ctrl-Y"))
         {
             actionHistory.redo(editorState);
+            didChange = true;
         }
 
         ImGui::EndMenu();
@@ -409,9 +411,17 @@ static bool handleKeyboard(const KeyboardState& keyboard, float& t)
 
     if (keyboard.wasKeyPressed(VK_SPACE)) isPlaying = !isPlaying;
 
-    if (keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed('Z')) actionHistory.undo(editorState);
+    if (keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed('Z'))
+    {
+        actionHistory.undo(editorState);
+        shouldRerender = true;
+    }
 
-    if (keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed('Y')) actionHistory.redo(editorState);
+    if (keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed('Y'))
+    {
+        actionHistory.redo(editorState);
+        shouldRerender = true;
+    }
 
     if (handleKeyScrubbing(keyboard, t, isEndKeyframe, (int)editorState.config.lengthInBeats, editorState.config.uniformList,
             editorState.cameraController))
