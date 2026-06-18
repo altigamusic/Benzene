@@ -502,7 +502,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         shouldRerender |= renderToolbar(timeInBeats, info);
 
-        if (renderTimelines(&timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, uniformList, cameraController, currentGroup,
+        if (renderTimelines(timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, uniformList, cameraController, currentGroup,
                 demoTimeLength, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
         {
             shouldRerender = true;

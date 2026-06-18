@@ -168,13 +168,13 @@ bool handleKeyScrubbing(const KeyboardState& keyboard, float& timeInBeats, bool&
     return false;
 }
 
-bool renderTimelines(float* timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
+bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
     CameraKeyframeController& cameraController, const std::string& currentGroup, int demoTimeLength, float* loopStart, float* loopEnd)
 {
     bool didChange = false;
 
     ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, (float)demoTimeLength);
-    didChange |= TimeSlider("Time", timeInBeats, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
+    didChange |= TimeSlider("Time", &timeInBeats, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
 
     if (cameraController.positionUniform.keyframes.size() > 1)
     {
@@ -186,7 +186,7 @@ bool renderTimelines(float* timeInBeats, float& minTime, float& maxTime, bool& i
             keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
-        if (KeyframeSlider("Camera", timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
+        if (KeyframeSlider("Camera", &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
             {
@@ -212,7 +212,7 @@ bool renderTimelines(float* timeInBeats, float& minTime, float& maxTime, bool& i
 
         KeyframeMovementData kfMovement;
 
-        if (KeyframeSlider(uniform.name.c_str(), timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
+        if (KeyframeSlider(uniform.name.c_str(), &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
         {
             if (kfMovement.index >= 0)
                 uniform.keyframes[kfMovement.index].time = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
