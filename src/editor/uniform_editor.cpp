@@ -184,66 +184,84 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
         }
 
         bool hasKeyframeAtCurrentTime = keyframeAtCurrentTime != nullptr;
-        bool shouldHaveKeyframeAtCurrentTime = hasKeyframeAtCurrentTime;
         KeyframeInterpolation interpolation =
             hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolation : KeyframeInterpolation::Linear;
         float tension = hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
 
         bool canSplitToDual = hasKeyframeAtCurrentTime && uniform.countKeyframesAtTime(time) < 2;
-        bool shouldSplitToDual = false;
 
         ImGui::SameLine();
-        bool didKeyframeInfoChange = KeyframeMarkerWithContextMenu(
-            (uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension, canSplitToDual, &shouldSplitToDual);
+        auto markerResult = KeyframeMarkerWithContextMenu(
+            (uniform.name + "_kf").c_str(), hasKeyframeAtCurrentTime, &interpolation, &tension, canSplitToDual);
 
-        if (shouldSplitToDual && keyframeAtCurrentTime != nullptr)
+        if (markerResult.has_value())
         {
-            actionHistory.execute(
-                std::make_unique<SplitKeyframeToDual>(uniform.name, time, keyframeAtCurrentTime->value, interpolation, tension),
-                editorState);
+            std::visit(
+                [&](auto&& arg)
+                {
+                    using T = std::decay_t<decltype(arg)>;
+
+                    if constexpr (std::is_same_v<T, KeyframeMarkerResult::KeyframeRemoved>)
+                    {
+                        actionHistory.execute(
+                            std::make_unique<DeleteKeyframe>(uniform.name, time, isEndKeyframe, *keyframeAtCurrentTime), editorState);
+                    }
+                    else if constexpr (std::is_same_v<T, KeyframeMarkerResult::SplitToDual>)
+                    {
+                        actionHistory.execute(
+                            std::make_unique<SplitKeyframeToDual>(uniform.name, time, keyframeAtCurrentTime->value, interpolation, tension),
+                            editorState);
+                        shouldKeepPlaying = false;
+                    }
+                    else if constexpr (std::is_same_v<T, KeyframeMarkerResult::DragTension>)
+                    {
+                        // Set keyframe without recording the tension action (which will be recorded on ChangeTension)
+                        uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
+                    }
+                    else if constexpr (std::is_same_v<T, KeyframeMarkerResult::KeyframeAdded> ||
+                                       std::is_same_v<T, KeyframeMarkerResult::ChangeInterpolation> ||
+                                       std::is_same_v<T, KeyframeMarkerResult::ChangeTension>)
+                    {
+                        // All these actions require setting a keyframe
+                        std::optional<UniformKeyframe> before = std::nullopt;
+
+                        if (keyframeAtCurrentTime)
+                        {
+                            before = std::optional<UniformKeyframe>(*keyframeAtCurrentTime);
+
+                            if constexpr (std::is_same_v<T, KeyframeMarkerResult::ChangeInterpolation>) before->interpolation = arg.from;
+                            if constexpr (std::is_same_v<T, KeyframeMarkerResult::ChangeTension>) before->interpolationFactor = arg.from;
+                        }
+
+                        uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
+
+                        actionHistory.record(
+                            std::make_unique<ChangeUniformValue>(uniform.name, time, isEndKeyframe, before, value, interpolation, tension));
+
+                        // Pause only if a keyframe was created, no other reason
+                        if (std::is_same_v<T, KeyframeMarkerResult::KeyframeAdded>) shouldKeepPlaying = false;
+                    }
+                },
+                markerResult->value);
+
             didAnythingChange = true;
-            shouldKeepPlaying = false;
         }
 
         // Set a keyframe if the uniform changed *only if* it's before another keyframe!
         // This is because if it's after the last one, it's more natural to just update the last keyframe value instead.
         // However, if we're between two keyframes, we don't know which keyframe the user would want to change, or how to interpolate the
         // data.
-        bool shouldSetKeyframeDueToUniformChange = didThisUniformChange && !isBeyondLastKeyframe;
-        bool shouldSetKeyframeDueToMarkerChange = didKeyframeInfoChange && shouldHaveKeyframeAtCurrentTime;
-
-        bool shouldSetKeyframe = shouldSetKeyframeDueToUniformChange || shouldSetKeyframeDueToMarkerChange;
-        bool shouldRemoveKeyframe = didKeyframeInfoChange && !shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime;
-        bool shouldUpdateLastKeyframeValue = didThisUniformChange && isBeyondLastKeyframe;
-
-        if (shouldSetKeyframe)
+        if (didThisUniformChange && !isBeyondLastKeyframe)
         {
-            if (shouldSetKeyframeDueToMarkerChange && !shouldSetKeyframeDueToUniformChange)
-            {
-                // Marker-driven changes (toggling the keyframe on, changing interpolation/tension) are discrete,
-                // single-frame events - record them immediately rather than relying on the value-widget's drag tracking below.
-                std::optional<UniformKeyframe> before =
-                    keyframeAtCurrentTime ? std::optional<UniformKeyframe>(*keyframeAtCurrentTime) : std::nullopt;
-                uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
-                // actionHistory.record(
-                //     std::make_unique<ChangeUniformValue>(uniform.name, time, isEndKeyframe, before, value, interpolation, tension));
-            }
-            else
-            {
-                uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
-            }
+            uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
             didAnythingChange = true;
-            shouldKeepPlaying = false; // Pause only if a keyframe was created, no other reason
+            shouldKeepPlaying = false;
         }
-        else if (shouldUpdateLastKeyframeValue)
+        else if (didThisUniformChange && isBeyondLastKeyframe)
         {
-            uniform.setKeyframeAtTime(lastKeyframeTime, true, value, interpolation, tension);
-            didAnythingChange = true;
-        }
-        else if (shouldRemoveKeyframe)
-        {
-            // Remove the keyframe at the current time
-            actionHistory.execute(std::make_unique<DeleteKeyframe>(uniform.name, time, isEndKeyframe, *keyframeAtCurrentTime), editorState);
+            KeyframeInterpolation lastInterpolation = targetKeyframe ? targetKeyframe->interpolation : interpolation;
+            float lastTension = targetKeyframe ? targetKeyframe->interpolationFactor : tension;
+            uniform.setKeyframeAtTime(lastKeyframeTime, true, value, lastInterpolation, lastTension);
             didAnythingChange = true;
         }
 
