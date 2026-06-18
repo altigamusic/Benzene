@@ -1072,6 +1072,58 @@ void renderSettingsWindow()
     ImGui::End();
 }
 
+/// @brief Render the toolbar, and run button functions if clicked.
+/// @param t The current time, in beats. Modified if the prev/next buttons are clicked.
+/// @param info Used for opening a file dialog if the user wants to choose a music file.
+bool renderToolbar(float& t, WININFO* info)
+{
+    bool shouldRerender = false;
+    bool backButton = ImGui::Button("Prev");
+    ImGui::SameLine();
+    bool forwardButton = ImGui::Button("Next");
+    ImGui::SameLine();
+
+    if (PlayPauseButton(isPlaying))
+    {
+        isPlaying = !isPlaying;
+        shouldRerender = true;
+    }
+
+    if (handleKeyScrubbing(t, demoTimeLength, backButton, forwardButton))
+    {
+        isPlaying = false;
+        shouldRerender = true;
+    }
+
+    ImGui::SameLine(0, 50);
+    ImGui::Text("BPM:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50);
+    ImGui::DragInt("##BPM", &bpm, 1.0f, 10, 5000);
+
+    ImGui::SameLine(0, 50);
+    ImGui::Text("Length:");
+
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50);
+    int prevDemoTimeLength = demoTimeLength;
+    ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
+
+    if (demoTimeLength != prevDemoTimeLength && loopEndTime > demoTimeLength) loopEndTime = demoTimeLength;
+
+    ImGui::SameLine(0, 50);
+    ImGui::Checkbox("Loop Segment", &isAbLooping);
+    ImGui::SameLine();
+    ImGui::Checkbox("Play Music", &shouldPlayMusic);
+    ImGui::SameLine();
+    if (ImGui::Button("Open..."))
+    {
+        EditorMusic::OpenFileDialogAndLoad(info->hWnd);
+    }
+
+    return shouldRerender;
+}
+
 bool renderMenuBar()
 {
     bool didChange = false;
@@ -1197,49 +1249,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
-        bool backButton = ImGui::Button("Prev");
-        ImGui::SameLine();
-        bool forwardButton = ImGui::Button("Next");
-        ImGui::SameLine();
-
-        if (PlayPauseButton(isPlaying))
-        {
-            isPlaying = !isPlaying;
-            shouldRerender = true;
-        }
-
-        if (handleKeyScrubbing(t, demoTimeLength, backButton, forwardButton))
-        {
-            isPlaying = false;
-            shouldRerender = true;
-        }
-
-        ImGui::SameLine(0, 50);
-        ImGui::Text("BPM:");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(50);
-        ImGui::DragInt("##BPM", &bpm, 1.0f, 10, 5000);
-
-        ImGui::SameLine(0, 50);
-        ImGui::Text("Length:");
-
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(50);
-        int prevDemoTimeLength = demoTimeLength;
-        ImGui::DragInt("beats", &demoTimeLength, 1.0f, 0, INT_MAX);
-
-        // Update loop end time if demo length changed
-        if (demoTimeLength != prevDemoTimeLength && loopEndTime > demoTimeLength) loopEndTime = demoTimeLength;
-
-        ImGui::SameLine(0, 50);
-        ImGui::Checkbox("Loop Segment", &isAbLooping);
-        ImGui::SameLine();
-        ImGui::Checkbox("Play Music", &shouldPlayMusic);
-        ImGui::SameLine();
-        if (ImGui::Button("Open..."))
-        {
-            EditorMusic::OpenFileDialogAndLoad(info->hWnd);
-        }
+        shouldRerender |= renderToolbar(t, info);
 
         if (renderTimelines(
                 &t, timelineViewStart, timelineViewEnd, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
