@@ -955,64 +955,62 @@ int findNextKeyframe(int t, const std::vector<int>& keyframes, bool& isEnd)
     return -1; // No next keyframe
 }
 
-bool handleKeyScrubbing(float& t, int maxTimelineTime, bool backButton, bool forwardButton)
+bool scrubToPreviousKeyframe(float& t)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureKeyboard && !backButton && !forwardButton) return false;
+    std::vector<int> keyframes = getAllKeyframes();
+    int prevKeyframe = findPreviousKeyframe(t, keyframes, isEndKeyframe);
+    if (prevKeyframe == -1) return false;
+    t = prevKeyframe;
+    return true;
+}
 
-    // Get sorted list of all keyframes
+bool scrubToNextKeyframe(float& t)
+{
+    std::vector<int> keyframes = getAllKeyframes();
+    int nextKeyframe = findNextKeyframe(t, keyframes, isEndKeyframe);
+    if (nextKeyframe == -1) return false;
+    t = nextKeyframe;
+    return true;
+}
+
+bool handleKeyScrubbing(const KeyboardState& keyboard, float& t, int maxTimelineTime)
+{
     std::vector<int> keyframes = getAllKeyframes();
 
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || backButton)
+    if (keyboard.wasKeyPressed(VK_LEFT))
     {
-        if (io.KeyCtrl || backButton)
-        {
-            int prevKeyframe = findPreviousKeyframe(t, keyframes, isEndKeyframe);
+        if (keyboard.isDown(VK_CONTROL)) return scrubToPreviousKeyframe(t);
 
-            if (prevKeyframe != -1)
-            {
-                t = prevKeyframe;
-                return true;
-            }
-        }
-        else if (isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
+        if (isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
         {
             // If we're on the end half of a dual keyframe, move to the start half without changing the time
             isEndKeyframe = false;
-            return true;
         }
         else
         {
             t = max(0, std::ceil(t) - 1);
             isEndKeyframe = true; // When moving back we always move to the end
-            return true;
         }
+
+        return true;
     }
 
-    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || forwardButton)
+    if (keyboard.wasKeyPressed(VK_RIGHT))
     {
-        if (io.KeyCtrl || forwardButton)
-        {
-            int nextKeyframe = findNextKeyframe(t, keyframes, isEndKeyframe);
+        if (keyboard.isDown(VK_CONTROL)) return scrubToNextKeyframe(t);
 
-            if (nextKeyframe != -1)
-            {
-                t = nextKeyframe;
-                return true;
-            }
-        }
-        else if (!isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
+        if (!isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
         {
             // If we're on the start half of a dual keyframe, move to the end half without changing the time
             isEndKeyframe = true;
-            return true;
         }
         else
         {
             t = min(maxTimelineTime, std::floor(t) + 1);
             isEndKeyframe = false; // When moving forward we always move to the start
-            return true;
         }
+
+        return true;
     }
 
     return false;
@@ -1065,20 +1063,24 @@ void renderSettingsWindow()
 bool renderToolbar(float& t, WININFO* info)
 {
     bool shouldRerender = false;
-    bool backButton = ImGui::Button("Prev");
-    ImGui::SameLine();
-    bool forwardButton = ImGui::Button("Next");
-    ImGui::SameLine();
 
-    if (PlayPauseButton(isPlaying))
+    if (ImGui::Button("Prev") && scrubToPreviousKeyframe(t))
     {
-        isPlaying = !isPlaying;
+        isPlaying = false;
         shouldRerender = true;
     }
 
-    if (handleKeyScrubbing(t, demoTimeLength, backButton, forwardButton))
+    ImGui::SameLine();
+    if (ImGui::Button("Next") && scrubToNextKeyframe(t))
     {
         isPlaying = false;
+        shouldRerender = true;
+    }
+
+    ImGui::SameLine();
+    if (PlayPauseButton(isPlaying))
+    {
+        isPlaying = !isPlaying;
         shouldRerender = true;
     }
 
@@ -1146,13 +1148,15 @@ bool renderMenuBar()
 /// Handle keyboard shortcuts.
 /// </summary>
 /// <param name="keyboard">The keyboard state.</param>
-static void handleKeyboard(const KeyboardState& keyboard)
+static void handleKeyboard(const KeyboardState& keyboard, float& t)
 {
     if (keyboard.wasKeyPressed(VK_ESCAPE)) PostQuitMessage(0);
 
     if (keyboard.wasKeyPressed(VK_F1)) showDemoWindow = true;
 
     if (keyboard.wasKeyPressed(VK_SPACE)) isPlaying = !isPlaying;
+
+    if (handleKeyScrubbing(keyboard, t, demoTimeLength)) isPlaying = false;
 }
 
 float msToBeats(long ms, float bpm) { return ms * bpm / 60000; }
@@ -1236,7 +1240,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::NewFrame();
         mouseState.newFrame();
         keyboardState.newFrame();
-        handleKeyboard(keyboardState);
+        handleKeyboard(keyboardState, t);
 
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
         if (showSettingsWindow) renderSettingsWindow();
