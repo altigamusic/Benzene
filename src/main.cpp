@@ -26,6 +26,7 @@
 #include "keyframe_marker.h"
 #include "window_renderer.h"
 #include "debug_window.h"
+#include "save_dialog.h"
 #include "uniform_editor.h"
 #include "timeline.h"
 
@@ -408,7 +409,7 @@ long beatsToMs(float beats, float bpm) { return 60000 / bpm * beats; }
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     MSG msg;
-    bool showSaveDialog = false;
+    SaveDialog saveDialog;
     bool done = false;
     WININFO* info = &wininfo;
 
@@ -474,7 +475,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
-            if (msg.message == WM_QUIT) showSaveDialog = true;
+            if (msg.message == WM_QUIT) saveDialog.open();
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
@@ -573,36 +574,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         prevShouldRerender = shouldRerender;
 
-        if (showSaveDialog)
-        {
-            // Place the save dialog in the center-top
-            ImGuiIO& io = ImGui::GetIO();
-            ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.125f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-
-            if (ImGui::Begin("Save?", &showSaveDialog, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
-            {
-                ImGui::Text("Save changes before closing?");
-                if (ImGui::Button("Yes"))
-                {
-                    saveConfigToFile(configFileName);
-                    showSaveDialog = false;
-                    done = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("No"))
-                {
-                    showSaveDialog = false;
-                    done = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Cancel"))
-                {
-                    showSaveDialog = false;
-                }
-
-                ImGui::End();
-            }
-        }
+        if (saveDialog.render(done))
+            saveConfigToFile(configFileName);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
