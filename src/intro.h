@@ -3,15 +3,13 @@
 #include "ext.h"
 
 #ifdef EDITOR
-extern int windowWidth;
-extern int windowHeight;
-extern int viewportWidth;
-extern int viewportHeight;
+#include "window_renderer.h"
+extern WindowRenderer windowRenderer;
 
-#define WINDOW_WIDTH windowWidth
-#define WINDOW_HEIGHT windowHeight
-#define VIEWPORT_WIDTH viewportWidth
-#define VIEWPORT_HEIGHT viewportHeight
+#define WINDOW_WIDTH windowRenderer.windowWidth
+#define WINDOW_HEIGHT windowRenderer.windowHeight
+#define VIEWPORT_WIDTH windowRenderer.viewportWidth
+#define VIEWPORT_HEIGHT windowRenderer.viewportHeight
 #else
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600

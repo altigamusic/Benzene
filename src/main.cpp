@@ -24,15 +24,10 @@
 #include "imgui/imgui_benzene_widgets.h"
 #include "config.h"
 #include "keyframe_marker.h"
+#include "window_renderer.h"
+#include "uniform_editor.h"
+#include "timeline.h"
 
-int sidebarWidth;
-int sidebarHeight;
-int windowWidth = 1200;
-int windowHeight = 800;
-int viewportWidth = 800;
-int viewportHeight = 600;
-int timelineWidth;
-int timelineHeight = 200;
 CameraKeyframeController cameraController;
 const char* configFileName = "config.json";
 
@@ -50,18 +45,6 @@ float loopStartTime = 0.0f;
 float loopEndTime = 140.0f;
 bool shouldPlayMusic = true;
 
-void resizeWindow(int width, int height)
-{
-    windowWidth = width;
-    windowHeight = height;
-    sidebarWidth = windowWidth - viewportWidth;
-    sidebarHeight = viewportHeight;
-    timelineWidth = windowWidth;
-    timelineHeight = windowHeight - viewportHeight;
-
-    glViewport(sidebarWidth, timelineHeight, viewportWidth, viewportHeight);
-}
-
 bool showDebugWindow = false;
 std::string debugError;
 bool showSettingsWindow = false;
@@ -72,22 +55,14 @@ bool isEndKeyframe = true;
 KeyboardState keyboardState;
 MouseState mouseState;
 
-static GLuint fragmentShaderProgram = 0;
-static GLuint timeLocation;
-static GLuint resolutionLocation = -1;
-static GLuint windowOffsetLocation = -1;
+WindowRenderer windowRenderer;
 
-static GLuint cameraPositionLocation = -1;
-static GLuint cameraTargetLocation = -1;
-static GLuint cameraRotationLocation = -1;
-
-std::string currentShader;
 std::vector<Uniform> uniformList;
 
 std::vector<std::string> groups;
 std::string currentGroup;
 
-void openDebugWindow(std::string error)
+void openDebugWindow(const std::string& error)
 {
     debugError += error + "\n";
     showDebugWindow = true;
@@ -99,205 +74,9 @@ void closeDebugWindow()
     showDebugWindow = false;
 }
 
-std::vector<std::string> getUndeclaredIdentifiers(std::string error)
-{
-    std::regex undeclaredIdentifierRegex(
-        "Undeclared identifier:\\s*(\\w+)\\s*$|['\"](\\w+)['\"]\\s*:\\s*undeclared "
-        "identifier|[uU]ndefined\\s+[Vv]ariable\\s+['\"](\\w+)['\"]",
-        std::regex::icase);
-
-    std::vector<std::string> result;
-    std::smatch match;
-
-    std::string::const_iterator searchStart(error.cbegin());
-    while (std::regex_search(searchStart, error.cend(), match, undeclaredIdentifierRegex))
-    {
-        if (match.size() > 1)
-        {
-            // Only one group will match something and the other(s) will be empty
-            for (size_t i = 1; i < match.size(); ++i)
-            {
-                if (match[i].matched && std::find(result.begin(), result.end(), match[i].str()) == result.end())
-                {
-                    result.push_back(match[i].str());
-                    break;
-                }
-            }
-        }
-        searchStart = match.suffix().first;
-    }
-
-    return result;
-}
-
-std::string generateUniformCode()
-{
-    std::stringstream uniformStream;
-    for (const Uniform& uniform : uniformList)
-    {
-        switch (uniform.type)
-        {
-        case UniformType::Float:
-            uniformStream << "uniform float " << uniform.name << ";\n";
-            break;
-        case UniformType::Int:
-            uniformStream << "uniform int " << uniform.name << ";\n";
-            break;
-        case UniformType::Bool:
-            uniformStream << "uniform bool " << uniform.name << ";\n";
-            break;
-        case UniformType::Vec2:
-            uniformStream << "uniform vec2 " << uniform.name << ";\n";
-            break;
-        case UniformType::Vec3:
-        case UniformType::Color:
-            uniformStream << "uniform vec3 " << uniform.name << ";\n";
-            break;
-        case UniformType::Vec4:
-            uniformStream << "uniform vec4 " << uniform.name << ";\n";
-            break;
-        }
-    }
-    return uniformStream.str();
-}
-
-void loadFragmentShader(std::string fragmentShaderSource, bool didTryInjecting = false)
-{
-    int length;
-    char infoLog[500];
-
-    if (fragmentShaderProgram != 0)
-    {
-        glDeleteProgram(fragmentShaderProgram);
-        fragmentShaderProgram = 0;
-    }
-
-    std::string source =
-        "#version 330\n"
-        "uniform vec2 _res, _windowOffset;\n"
-        "uniform float _t;\n"
-        "uniform vec3 _cp, _ct, _cr;\n"
-        "vec2 fragCoord = gl_FragCoord.xy - _windowOffset;\n" +
-        generateUniformCode() + fragmentShaderSource;
-
-    const char* srcPtr = source.c_str();
-    fragmentShaderProgram = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &srcPtr);
-
-    glGetProgramInfoLog(fragmentShaderProgram, 500, &length, infoLog);
-
-    std::string error(infoLog, length);
-
-    if (length > 0)
-    {
-        if (!didTryInjecting)
-        {
-            auto undeclaredIdentifiers = getUndeclaredIdentifiers(error);
-
-            // Inject all undeclared identifiers as uniforms and recompile
-            for (const std::string& name : undeclaredIdentifiers)
-            {
-                Uniform new_uniform{name, UniformType::Float};
-                new_uniform.group = currentGroup;
-                uniformList.push_back(new_uniform);
-            }
-
-            return loadFragmentShader(fragmentShaderSource, true);
-        }
-
-        openDebugWindow(error);
-        return;
-    }
-    else
-    {
-        closeDebugWindow();
-    }
-
-    timeLocation = glGetUniformLocation(fragmentShaderProgram, "_t");
-    resolutionLocation = glGetUniformLocation(fragmentShaderProgram, "_res");
-    windowOffsetLocation = glGetUniformLocation(fragmentShaderProgram, "_windowOffset");
-    cameraPositionLocation = glGetUniformLocation(fragmentShaderProgram, "_cp");
-    cameraTargetLocation = glGetUniformLocation(fragmentShaderProgram, "_ct");
-    cameraRotationLocation = glGetUniformLocation(fragmentShaderProgram, "_cr");
-
-    resizeWindow(windowWidth, windowHeight);
-
-    for (Uniform& uniform : uniformList)
-    {
-        uniform.location = glGetUniformLocation(fragmentShaderProgram, uniform.name.c_str());
-        /*if (uniform.location == -1)
-        {
-            debugError = "Uniform '" + uniform.name + "' not found in shader!";
-            showDebugWindow = true;
-        }*/
-    }
-
-    glUseProgram(fragmentShaderProgram);
-    initIntro(fragmentShaderProgram);
-}
-
-bool reloadFragmentShaderFromFile()
-{
-    const char* fragmentShaderPath = "shaders/FragmentShader.glsl";
-
-    std::ifstream fragmentShaderFile(fragmentShaderPath);
-    std::stringstream stringStream;
-    stringStream << fragmentShaderFile.rdbuf();
-
-    std::string s = stringStream.str();
-
-    bool didChange = s != currentShader;
-
-    if (didChange && !s.empty())
-    {
-        loadFragmentShader(s.c_str());
-    }
-
-    currentShader = std::move(s);
-
-    return didChange;
-}
-
 void updateUniforms(const float ftime)
 {
-    glUniform1f(timeLocation, ftime);
-    glUniform2f(resolutionLocation, viewportWidth, viewportHeight);
-    glUniform2f(windowOffsetLocation, sidebarWidth, timelineHeight);
-
-    vec3 cp = cameraController.getPosition();
-    vec3 ct = cameraController.getTarget();
-    vec3 cr = cameraController.getRotation();
-
-    glUniform3f(cameraPositionLocation, cp.x, cp.y, cp.z);
-    glUniform3f(cameraTargetLocation, ct.x, ct.y, ct.z);
-    glUniform3f(cameraRotationLocation, cr.x, cr.y, cr.z);
-
-    for (Uniform& uniform : uniformList)
-    {
-        auto value = uniform.valueAtTime(ftime, isEndKeyframe, shaderQuantizationDigits);
-
-        switch (uniform.type)
-        {
-        case UniformType::Float:
-            glUniform1f(uniform.location, value.f);
-            break;
-        case UniformType::Int:
-            glUniform1i(uniform.location, value.i);
-            break;
-        case UniformType::Bool:
-            glUniform1i(uniform.location, value.b ? 1 : 0);
-            break;
-        case UniformType::Vec2:
-            glUniform2f(uniform.location, value.v2[0], value.v2[1]);
-            break;
-        case UniformType::Vec3:
-        case UniformType::Color:
-            glUniform3f(uniform.location, value.v3[0], value.v3[1], value.v3[2]);
-            break;
-        case UniformType::Vec4:
-            glUniform4f(uniform.location, value.v4[0], value.v4[1], value.v4[2], value.v4[3]);
-            break;
-        }
-    }
+    windowRenderer.updateUniforms(ftime, uniformList, cameraController, isEndKeyframe, shaderQuantizationDigits);
 }
 
 #pragma region Window and Rendering Boilerplate
@@ -335,7 +114,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
     if (uMsg == WM_SIZE)
     {
-        resizeWindow(LOWORD(lParam), HIWORD(lParam));
+        windowRenderer.resize(LOWORD(lParam), HIWORD(lParam));
         return 0;
     }
 
@@ -407,8 +186,8 @@ static bool window_init(WININFO* info)
         dmScreenSettings.dmSize = sizeof(DEVMODE);
         dmScreenSettings.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
         dmScreenSettings.dmBitsPerPel = 32;
-        dmScreenSettings.dmPelsWidth = windowWidth;
-        dmScreenSettings.dmPelsHeight = windowHeight;
+        dmScreenSettings.dmPelsWidth = windowRenderer.windowWidth;
+        dmScreenSettings.dmPelsHeight = windowRenderer.windowHeight;
         if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) return false;
         dwExStyle = WS_EX_APPWINDOW;
         dwStyle = WS_VISIBLE | WS_POPUP; // | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
@@ -422,8 +201,8 @@ static bool window_init(WININFO* info)
 
     rec.left = 0;
     rec.top = 0;
-    rec.right = windowWidth;
-    rec.bottom = windowHeight;
+    rec.right = windowRenderer.windowWidth;
+    rec.bottom = windowRenderer.windowHeight;
     AdjustWindowRect(&rec, dwStyle, 0);
 
     info->hWnd = CreateWindowEx(dwExStyle, wc.lpszClassName, "Benzene", dwStyle,
@@ -444,296 +223,6 @@ static bool window_init(WININFO* info)
     return true;
 }
 #pragma endregion
-
-bool renderSingleUniformTab(std::string group, float time, bool& shouldKeepPlaying)
-{
-    bool didAnythingChange = false;
-    bool shouldReloadFragmentShader = false;
-
-    auto uniformToDelete = uniformList.end();
-
-    for (auto uniformIt = uniformList.begin(); uniformIt != uniformList.end(); ++uniformIt)
-    {
-        Uniform& uniform = *uniformIt;
-
-        if (uniform.group != group) continue;
-
-        UniformValue value = uniform.valueAtTime(time, isEndKeyframe);
-        bool didThisUniformChange = false;
-        UniformKeyframe* keyframeAtCurrentTime = uniform.getKeyframeAtTime(time, isEndKeyframe);
-
-        switch (uniform.type)
-        {
-        case UniformType::Float:
-            didThisUniformChange = ImGui::DragFloat(uniform.name.c_str(), &value.f, 0.005f);
-            break;
-        case UniformType::Int:
-            didThisUniformChange = ImGui::DragInt(uniform.name.c_str(), &value.i, 0.005f);
-            break;
-        case UniformType::Bool:
-            didThisUniformChange = ImGui::Checkbox(uniform.name.c_str(), &value.b);
-            break;
-        case UniformType::Vec2:
-            didThisUniformChange = DragVector2(uniform.name.c_str(), (ImVec2*)(&value.v2), 0.005f);
-            break;
-        case UniformType::Color:
-            didThisUniformChange = ImGui::ColorEdit3(uniform.name.c_str(), value.v3);
-            break;
-        }
-
-        int uniformTypeIndex = uniform.type == UniformType::Float   ? 0
-                               : uniform.type == UniformType::Vec2  ? 1
-                               : uniform.type == UniformType::Vec3  ? 2
-                               : uniform.type == UniformType::Color ? 3
-                                                                    : 0;
-
-        char* items[] = {"float", "vec2", "color"};
-
-        if (ImGui::BeginPopupContextItem(uniform.name.c_str()))
-        {
-            if (ImGui::Combo("Type", &uniformTypeIndex, items, 3))
-            {
-                switch (uniformTypeIndex)
-                {
-                case 0:
-                    uniform.type = UniformType::Float;
-                    break;
-                case 1:
-                    uniform.type = UniformType::Vec2;
-                    break;
-                case 2:
-                    uniform.type = UniformType::Color;
-                    break;
-                default:
-                    break;
-                }
-
-                // Don't activate didThisUniformChange here so a keyframe won't be created
-                didAnythingChange = true;
-                shouldReloadFragmentShader = true;
-                uniform.keyframes.clear();
-            }
-
-            int uniformGroupIndex = uniform.group.empty() ? 0 : std::find(groups.begin(), groups.end(), uniform.group) - groups.begin() + 1;
-
-            // Combo takes an array, so convert the groups to a const char*[]
-            std::vector<const char*> groupItems;
-            groupItems.reserve(groups.size() + 1);
-            groupItems.push_back("(no group)");
-            for (const std::string& g : groups)
-                groupItems.push_back(g.c_str());
-
-            if (ImGui::Combo("Group", &uniformGroupIndex, groupItems.data(), groupItems.size()))
-            {
-                if (uniformGroupIndex == 0) // No group
-                    uniform.group.clear();
-                else
-                    uniform.group = groups[uniformGroupIndex - 1];
-
-                didAnythingChange = true;
-            }
-
-            int quantizationIndex = uniform.quantization.has_value() ? uniform.quantization.value() + 1 : 0;
-            const char* quantizationItems[] = {"Default", "0", "1", "2", "3", "4", "5", "6"};
-
-            if (ImGui::Combo("Quantization", &quantizationIndex, quantizationItems, 8))
-            {
-                if (quantizationIndex == 0)
-                    uniform.quantization.reset();
-                else
-                    uniform.quantization = quantizationIndex - 1;
-
-                didAnythingChange = true;
-            }
-
-            if (ImGui::Selectable("Delete"))
-            {
-                uniformToDelete = uniformIt;
-                ImGui::End();
-                continue;
-            }
-
-            ImGui::End();
-        }
-
-        bool hasKeyframeAtCurrentTime = keyframeAtCurrentTime != nullptr;
-        bool shouldHaveKeyframeAtCurrentTime = hasKeyframeAtCurrentTime;
-        KeyframeInterpolation interpolation =
-            hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolation : KeyframeInterpolation::Linear;
-        float tension = hasKeyframeAtCurrentTime ? keyframeAtCurrentTime->interpolationFactor : 0.5f;
-
-        bool canSplitToDual = hasKeyframeAtCurrentTime && uniform.countKeyframesAtTime(time) < 2;
-        bool shouldSplitToDual = false;
-
-        ImGui::SameLine();
-        bool didKeyframeInfoChange = KeyframeMarkerWithContextMenu(
-            (uniform.name + "_kf").c_str(), &shouldHaveKeyframeAtCurrentTime, &interpolation, &tension, canSplitToDual, &shouldSplitToDual);
-
-        if (shouldSplitToDual && keyframeAtCurrentTime != nullptr)
-        {
-            uniform.insertKeyframeAtTime(time, true, keyframeAtCurrentTime->value, interpolation, tension);
-            didAnythingChange = true;
-            shouldKeepPlaying = false;
-        }
-
-        float lastKeyframeTime = uniform.keyframes.empty() ? 0 : uniform.keyframes.back().time;
-        bool isBeyondLastKeyframe = time > lastKeyframeTime;
-
-        // Set a keyframe if the uniform changed *only if* it's before another keyframe!
-        // This is because if it's after the last one, it's more natural to just update the last keyframe value instead.
-        // However, if we're between two keyframes, we don't know which keyframe the user would want to change, or how to interpolate the
-        // data.
-        bool shouldSetKeyframeDueToUniformChange = didThisUniformChange && !isBeyondLastKeyframe;
-        bool shouldSetKeyframeDueToMarkerChange = didKeyframeInfoChange && shouldHaveKeyframeAtCurrentTime;
-
-        bool shouldSetKeyframe = shouldSetKeyframeDueToUniformChange || shouldSetKeyframeDueToMarkerChange;
-        bool shouldRemoveKeyframe = didKeyframeInfoChange && !shouldHaveKeyframeAtCurrentTime && hasKeyframeAtCurrentTime;
-        bool shouldUpdateLastKeyframeValue = didThisUniformChange && isBeyondLastKeyframe;
-
-        if (shouldSetKeyframe)
-        {
-            uniform.setKeyframeAtTime(time, isEndKeyframe, value, interpolation, tension);
-            didAnythingChange = true;
-            shouldKeepPlaying = false; // Pause only if a keyframe was created, no other reason
-        }
-        else if (shouldUpdateLastKeyframeValue)
-        {
-            uniform.setKeyframeAtTime(lastKeyframeTime, true, value, interpolation, tension);
-            didAnythingChange = true;
-        }
-        else if (shouldRemoveKeyframe)
-        {
-            // Remove the keyframe at the current time
-            uniform.removeKeyframeAtTime(time, isEndKeyframe);
-            didAnythingChange = true;
-        }
-    }
-
-    if (uniformToDelete != uniformList.end())
-    {
-        uniformList.erase(uniformToDelete);
-        shouldReloadFragmentShader = true;
-    }
-
-    if (shouldReloadFragmentShader) loadFragmentShader(currentShader.c_str());
-
-    return didAnythingChange;
-}
-
-std::optional<std::string> nameDialog(char* str_id)
-{
-    static char name[50] = "";
-    std::optional<std::string> result = std::nullopt;
-
-    if (ImGui::BeginPopup(str_id))
-    {
-        if (ImGui::IsWindowAppearing())
-        {
-            // Window just opened - clear name and focus
-            name[0] = 0;
-            ImGui::SetKeyboardFocusHere(0);
-        }
-
-        bool wasEnterPressed = ImGui::InputText("Name", name, 50, ImGuiInputTextFlags_EnterReturnsTrue);
-
-        if (ImGui::Button("OK") || wasEnterPressed)
-        {
-            result = std::string(name);
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-
-    return result;
-}
-
-bool renderAndUpdateUniforms(float time, bool& shouldKeepPlaying)
-{
-    if (uniformList.empty()) return false;
-
-    bool didAnythingChange = false;
-
-    ImGui::SeparatorText("Uniforms");
-
-    // Force the uniform window to leave enough room for the camera panel
-    float maxWindowHeight = sidebarHeight - ImGui::GetTextLineHeightWithSpacing() * 21.0f;
-    float windowHeight = min(sidebarHeight / 2, maxWindowHeight);
-
-    ImGui::BeginChild("Uniforms", ImVec2(0, windowHeight));
-
-    ImGui::BeginTabBar("Uniforms");
-
-    if (ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip)) ImGui::OpenPopup("Add Group Name");
-
-    auto result = nameDialog("Add Group Name");
-    if (result.has_value()) groups.push_back(result.value());
-
-    static int currentlyRenamedGroup = -1;
-
-    if (ImGui::BeginTabItem("Unsorted"))
-    {
-        currentGroup = "";
-        didAnythingChange = renderSingleUniformTab("", time, shouldKeepPlaying);
-        ImGui::EndTabItem();
-    }
-
-    for (int i = 0; i < groups.size(); i++)
-    {
-        std::string group = groups[i];
-        bool openRenameDialog = false;
-
-        if (ImGui::BeginTabItem(group.c_str()))
-        {
-            currentGroup = group;
-
-            if (ImGui::BeginPopupContextItem())
-            {
-                if (ImGui::Selectable("Rename"))
-                {
-                    currentlyRenamedGroup = i;
-                    ImGui::CloseCurrentPopup();
-
-                    ImGui::OpenPopup("Rename Group");
-                    openRenameDialog = true;
-                }
-
-                ImGui::EndPopup();
-            }
-
-            didAnythingChange = renderSingleUniformTab(group, time, shouldKeepPlaying);
-            ImGui::EndTabItem();
-        }
-
-        // This is necessary because OpenPopup needs to be called from the outside of the stack
-        if (openRenameDialog) ImGui::OpenPopup("Rename Group");
-    }
-
-    result = nameDialog("Rename Group");
-
-    if (result.has_value())
-    {
-        // Rename the group and uniforms
-        // Uniforms before the group so we don't forget the old name
-        for (Uniform& uniform : uniformList)
-        {
-            if (uniform.group == groups[currentlyRenamedGroup])
-            {
-                uniform.group = result.value();
-            }
-        }
-
-        groups[currentlyRenamedGroup] = result.value();
-
-        currentlyRenamedGroup = -1;
-    }
-
-    ImGui::EndTabBar();
-
-    ImGui::EndChild();
-
-    return didAnythingChange;
-}
 
 void loadConfigFromFile(const std::string& filename)
 {
@@ -786,236 +275,6 @@ void saveConfigToFile(const std::string& filename)
     }
 }
 
-std::vector<int> getAllKeyframes()
-{
-    std::vector<int> keyframes;
-
-    auto appendKeyframes = [&keyframes](const Uniform& uniform)
-    {
-        int previousTime = -1;
-        for (const UniformKeyframe& keyframe : uniform.keyframes)
-        {
-            int time = static_cast<int>(keyframe.time);
-            auto f = std::find(keyframes.begin(), keyframes.end(), time);
-            if (f == keyframes.end())
-            {
-                keyframes.push_back(time);
-            }
-            // If this is a dual keyframe, make sure the array also has a dual keyframe
-            else if (previousTime == time && (f + 1 == keyframes.end() || *(f + 1) != time))
-            {
-                keyframes.insert(f + 1, time);
-            }
-
-            previousTime = time;
-        }
-    };
-
-    for (const Uniform& uniform : uniformList)
-    {
-        appendKeyframes(uniform);
-    }
-
-    appendKeyframes(cameraController.positionUniform);
-    appendKeyframes(cameraController.rotationUniform);
-
-    std::sort(keyframes.begin(), keyframes.end());
-
-    return keyframes;
-}
-
-float getSnappedKeyframePosition(KeyframeMovementData& kfMovement, float maxTime, const std::vector<float>& keyframes)
-{
-    float minValue = kfMovement.index == 0 ? 0 : keyframes[kfMovement.index - 1];
-    float maxValue = kfMovement.index == keyframes.size() - 1 ? maxTime : keyframes[kfMovement.index + 1];
-
-    // If the keyframe on either side is already dual, prevent merging another keyframe into it by restricting the bounds
-    bool isDualKeyframeBefore = kfMovement.index > 1 && keyframes[kfMovement.index - 1] == keyframes[kfMovement.index - 2];
-    bool isDualKeyframeAfter =
-        kfMovement.index < keyframes.size() - 2 && keyframes[kfMovement.index + 1] == keyframes[kfMovement.index + 2];
-
-    if (isDualKeyframeBefore) minValue += 1;
-    if (isDualKeyframeAfter) maxValue -= 1;
-
-    // Round to snap keyframes
-    return std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
-}
-
-/// <summary>
-/// Renders timelines for all uniforms.
-/// Also handles user input for moving keyframes, zooming/panning the timeline, and scrubbing.
-/// Returns true if the time has changed from user input.
-/// </summary>
-/// <param name="time">The current time. Modified if the user scrubs or moves a keyframe.</param>
-/// <param name="minTime">The start point to draw the timelines from. Modified if the user zooms or pans.</param>
-/// <param name="maxTime">The end point to draw the timelines to. Modified if the user zooms or pans.</param>
-/// <param name="loopStart">The start of the loop, nullptr if there's no loop. Modified if the user moves the loop points.</param>
-/// <param name="loopEnd">The end of the loop, nullptr if there's no loop. Modified if the user moves the loop points.</param>
-/// <returns>True if the time has changed from user input, false if nothing was altered.</returns>
-bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopStart = nullptr, float* loopEnd = nullptr)
-{
-    bool didChange = false;
-
-    ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
-    didChange |= TimeSlider("Time", time, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
-
-    if (cameraController.positionUniform.keyframes.size() > 1)
-    {
-        // Camera slider is special because it's controlled differently
-        // Camera position and camera target have the same keyframes
-        std::vector<float> keyframes;
-
-        for (const UniformKeyframe& keyframe : cameraController.positionUniform.keyframes)
-            keyframes.push_back(keyframe.time);
-
-        KeyframeMovementData kfMovement;
-        if (KeyframeSlider("Camera", time, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
-        {
-            if (kfMovement.index >= 0)
-            {
-                float newTime = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
-
-                cameraController.positionUniform.keyframes[kfMovement.index].time = newTime;
-                cameraController.rotationUniform.keyframes[kfMovement.index].time = newTime;
-            }
-
-            didChange = true;
-        }
-    }
-
-    for (Uniform& uniform : uniformList)
-    {
-        // Display timelines only for animated uniforms, i.e. uniforms with 2+ keyframes
-        if (uniform.keyframes.size() <= 1 || uniform.group != currentGroup) continue;
-
-        std::vector<float> keyframes;
-
-        for (const UniformKeyframe& keyframe : uniform.keyframes)
-            keyframes.push_back(keyframe.time);
-
-        KeyframeMovementData kfMovement;
-
-        if (KeyframeSlider(uniform.name.c_str(), time, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement))
-        {
-            if (kfMovement.index >= 0)
-                uniform.keyframes[kfMovement.index].time = getSnappedKeyframePosition(kfMovement, maxTime, keyframes);
-
-            didChange = true;
-        }
-    }
-
-    return didChange;
-}
-
-bool hasDualKeyframe(const int t, const std::vector<int>& keyframes)
-{
-    auto it = std::find(keyframes.begin(), keyframes.end(), t);
-    return it != keyframes.end() && it + 1 != keyframes.end() && *(it + 1) == t;
-}
-
-int findPreviousKeyframe(int t, const std::vector<int>& keyframes, bool& isEnd)
-{
-    // Check dual keyframes
-    if (isEnd && hasDualKeyframe(t, keyframes))
-    {
-        // We're on the end half of a dual keyframe - move to the start half
-        isEnd = false;
-        return t;
-    }
-
-    auto it = std::lower_bound(keyframes.begin(), keyframes.end(), t);
-
-    if (it != keyframes.begin())
-    {
-        --it;
-        isEnd = true; // When moving back we always move to the end
-        return *it;
-    }
-
-    return -1; // No previous keyframe
-}
-
-int findNextKeyframe(int t, const std::vector<int>& keyframes, bool& isEnd)
-{
-    if (!isEnd && hasDualKeyframe(t, keyframes))
-    {
-        // We're on the start half of a dual keyframe - move to the end half
-        isEnd = true;
-        return t;
-    }
-
-    auto it = std::upper_bound(keyframes.begin(), keyframes.end(), t);
-
-    if (it != keyframes.end())
-    {
-        isEnd = false; // When moving forward we always move to the start
-        return *it;
-    }
-
-    return -1; // No next keyframe
-}
-
-bool scrubToPreviousKeyframe(float& t)
-{
-    std::vector<int> keyframes = getAllKeyframes();
-    int prevKeyframe = findPreviousKeyframe(t, keyframes, isEndKeyframe);
-    if (prevKeyframe == -1) return false;
-    t = prevKeyframe;
-    return true;
-}
-
-bool scrubToNextKeyframe(float& t)
-{
-    std::vector<int> keyframes = getAllKeyframes();
-    int nextKeyframe = findNextKeyframe(t, keyframes, isEndKeyframe);
-    if (nextKeyframe == -1) return false;
-    t = nextKeyframe;
-    return true;
-}
-
-bool handleKeyScrubbing(const KeyboardState& keyboard, float& t, int maxTimelineTime)
-{
-    std::vector<int> keyframes = getAllKeyframes();
-
-    if (keyboard.wasKeyPressed(VK_LEFT))
-    {
-        if (keyboard.isDown(VK_CONTROL)) return scrubToPreviousKeyframe(t);
-
-        if (isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
-        {
-            // If we're on the end half of a dual keyframe, move to the start half without changing the time
-            isEndKeyframe = false;
-        }
-        else
-        {
-            t = max(0, std::ceil(t) - 1);
-            isEndKeyframe = true; // When moving back we always move to the end
-        }
-
-        return true;
-    }
-
-    if (keyboard.wasKeyPressed(VK_RIGHT))
-    {
-        if (keyboard.isDown(VK_CONTROL)) return scrubToNextKeyframe(t);
-
-        if (!isEndKeyframe && hasDualKeyframe(static_cast<int>(t), keyframes))
-        {
-            // If we're on the start half of a dual keyframe, move to the end half without changing the time
-            isEndKeyframe = true;
-        }
-        else
-        {
-            t = min(maxTimelineTime, std::floor(t) + 1);
-            isEndKeyframe = false; // When moving forward we always move to the start
-        }
-
-        return true;
-    }
-
-    return false;
-}
-
 void renderDebugWindow()
 {
     if (ImGui::Begin("Shader Debug", &showDebugWindow))
@@ -1030,17 +289,13 @@ void renderSettingsWindow()
 {
     if (!ImGui::Begin("Settings", &showSettingsWindow, ImGuiWindowFlags_NoCollapse)) return;
 
-    bool didResolutionChange = false;
-
     ImGui::Text("Resolution: ");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    didResolutionChange |= ImGui::InputInt(" x ##xres", &releaseResolutionX, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::InputInt(" x ##xres", &releaseResolutionX, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(50);
-    didResolutionChange |= ImGui::InputInt("##yres", &releaseResolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
-
-    if (didResolutionChange) resizeWindow(windowWidth, windowHeight);
+    ImGui::InputInt("##yres", &releaseResolutionY, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
 
     ImGui::SeparatorText("Shader Quantization");
 
@@ -1064,14 +319,14 @@ bool renderToolbar(float& t, WININFO* info)
 {
     bool shouldRerender = false;
 
-    if (ImGui::Button("Prev") && scrubToPreviousKeyframe(t))
+    if (ImGui::Button("Prev") && scrubToPreviousKeyframe(t, isEndKeyframe, uniformList, cameraController))
     {
         isPlaying = false;
         shouldRerender = true;
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Next") && scrubToNextKeyframe(t))
+    if (ImGui::Button("Next") && scrubToNextKeyframe(t, isEndKeyframe, uniformList, cameraController))
     {
         isPlaying = false;
         shouldRerender = true;
@@ -1124,7 +379,11 @@ bool renderMenuBar()
             if (ImGui::MenuItem("Reload Uniforms From File"))
             {
                 loadConfigFromFile(configFileName);
-                loadFragmentShader(currentShader.c_str());
+                windowRenderer.reload(uniformList, currentGroup);
+                if (!windowRenderer.lastError.empty())
+                    openDebugWindow(windowRenderer.lastError);
+                else
+                    closeDebugWindow();
                 didChange = true;
             }
             if (ImGui::MenuItem("Save Uniforms"))
@@ -1148,15 +407,25 @@ bool renderMenuBar()
 /// Handle keyboard shortcuts.
 /// </summary>
 /// <param name="keyboard">The keyboard state.</param>
-static void handleKeyboard(const KeyboardState& keyboard, float& t)
+/// <param name="t">The current time, in beats. Modified if a shortcut that changes time is pressed.</param>
+/// <returns>True if the screen should be rerendered, false otherwise.</returns>
+static bool handleKeyboard(const KeyboardState& keyboard, float& t)
 {
+    bool shouldRerender = false;
+
     if (keyboard.wasKeyPressed(VK_ESCAPE)) PostQuitMessage(0);
 
     if (keyboard.wasKeyPressed(VK_F1)) showDemoWindow = true;
 
     if (keyboard.wasKeyPressed(VK_SPACE)) isPlaying = !isPlaying;
 
-    if (handleKeyScrubbing(keyboard, t, demoTimeLength)) isPlaying = false;
+    if (handleKeyScrubbing(keyboard, t, isEndKeyframe, demoTimeLength, uniformList, cameraController))
+    {
+        isPlaying = false;
+        shouldRerender = true;
+    }
+
+    return shouldRerender;
 }
 
 float msToBeats(long ms, float bpm) { return ms * bpm / 60000; }
@@ -1199,7 +468,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     long fpsStartSystemTime = prevSystemTime;
     long currentSystemTime = 0;
 
-    float t = 0;             // The current time, in beats
+    float timeInBeats = 0;   // The current time, in beats
     float playStartTime = 0; // The time at which playback started, in beats
     int frames = 0;
 
@@ -1216,17 +485,18 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         {
             long playTimeMs = currentSystemTime - playStartSystemTime;
             float playTimeBeats = msToBeats(playTimeMs, bpm);
-            t = playStartTime + playTimeBeats;
+            timeInBeats = playStartTime + playTimeBeats;
 
             if (isAbLooping && loopEndTime > loopStartTime)
                 // Note: fmodf doesn't work on negative values, so if the player is before the loop, it'll play until it.
                 // This is a feature - it's more convenient and preferable.
-                t = fmodf(t - loopStartTime, loopEndTime - loopStartTime) + loopStartTime;
+
+                timeInBeats = fmodf(timeInBeats - loopStartTime, loopEndTime - loopStartTime) + loopStartTime;
             else
-                t = fmodf(t, demoTimeLength);
+                timeInBeats = fmodf(timeInBeats, demoTimeLength);
         }
 
-        cameraController.startFrame(t, isEndKeyframe);
+        cameraController.startFrame(timeInBeats, isEndKeyframe);
 
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
@@ -1240,7 +510,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::NewFrame();
         mouseState.newFrame();
         keyboardState.newFrame();
-        handleKeyboard(keyboardState, t);
 
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
         if (showSettingsWindow) renderSettingsWindow();
@@ -1250,15 +519,17 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         bool shouldRerender = isPlaying;
 
-        ImGui::SetNextWindowPos(ImVec2(0, viewportHeight), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(timelineWidth, timelineHeight), ImGuiCond_Always);
+        shouldRerender |= handleKeyboard(keyboardState, timeInBeats);
+
+        ImGui::SetNextWindowPos(ImVec2(0, windowRenderer.viewportHeight), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(windowRenderer.timelineWidth, windowRenderer.timelineHeight), ImGuiCond_Always);
 
         ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
 
-        shouldRerender |= renderToolbar(t, info);
+        shouldRerender |= renderToolbar(timeInBeats, info);
 
-        if (renderTimelines(
-                &t, timelineViewStart, timelineViewEnd, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
+        if (renderTimelines(&timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, uniformList, cameraController, currentGroup,
+                demoTimeLength, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
         {
             shouldRerender = true;
             frames = -1;
@@ -1271,7 +542,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         // Sidebar
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(sidebarWidth, sidebarHeight), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(windowRenderer.sidebarWidth, windowRenderer.sidebarHeight), ImGuiCond_Always);
 
         ImGui::Begin("Editor", nullptr,
             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar |
@@ -1279,8 +550,19 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         if (renderMenuBar()) shouldRerender = true;
 
-        if (renderAndUpdateUniforms(t, isPlaying)) // The function will pause if necessary
+        bool shouldReloadFragmentShader = false;
+        if (renderAndUpdateUniforms(timeInBeats, isEndKeyframe, isPlaying, shouldReloadFragmentShader, uniformList, groups, currentGroup,
+                windowRenderer.sidebarHeight)) // The function will pause if necessary
             shouldRerender = true;
+
+        if (shouldReloadFragmentShader)
+        {
+            windowRenderer.reload(uniformList, currentGroup);
+            if (!windowRenderer.lastError.empty())
+                openDebugWindow(windowRenderer.lastError);
+            else
+                closeDebugWindow();
+        }
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
@@ -1299,27 +581,35 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         // Try reloading the file
         // TODO: Maybe change the way this is done or something
-        shouldRerender |= reloadFragmentShaderFromFile();
+        bool didReload = windowRenderer.reloadFromFile(uniformList, currentGroup);
+        if (didReload)
+        {
+            if (!windowRenderer.lastError.empty())
+                openDebugWindow(windowRenderer.lastError);
+            else
+                closeDebugWindow();
+        }
 
-        EditorMusic::Update(isPlaying && shouldPlayMusic, t, static_cast<float>(bpm));
+        shouldRerender |= didReload;
 
-        // If the render stopped just now, render to the back buffer
+        EditorMusic::Update(isPlaying && shouldPlayMusic, timeInBeats, static_cast<float>(bpm));
+
         if (prevShouldRerender && !shouldRerender)
         {
-            introLoop(t);
+            introLoop(timeInBeats);
             SwapBuffers(info->hDC);
-            introLoop(t);
+            introLoop(timeInBeats);
         }
 
         if (shouldRerender)
         {
-            introLoop(t);
+            introLoop(timeInBeats);
             frames++;
         }
 
         // If isPlaying changed, propagate the change to the time variables
         playStartSystemTime = isPlaying ? currentSystemTime : -1;
-        playStartTime = isPlaying ? t : -1;
+        playStartTime = isPlaying ? timeInBeats : -1;
 
         prevShouldRerender = shouldRerender;
 
