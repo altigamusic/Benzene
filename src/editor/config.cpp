@@ -1,7 +1,7 @@
 #include "config.h"
 #include <sstream>
 #include <fstream>
-#include "nlohmann/json.hpp"
+#include "../nlohmann/json.hpp"
 
 constexpr int CURRENT_VERSION = 1;
 

@@ -1,6 +1,6 @@
 #include "timeline.h"
-#include "imgui/imgui.h"
-#include "imgui/imgui_benzene_widgets.h"
+#include "../imgui/imgui.h"
+#include "../imgui/imgui_benzene_widgets.h"
 #include <algorithm>
 #include <cmath>
 

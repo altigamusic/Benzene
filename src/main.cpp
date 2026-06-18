@@ -14,21 +14,21 @@
 #include <vector>
 #include <iomanip>
 #include <windows.h>
-#include "CameraController.h"
-#include "CameraKeyframeController.h"
-#include "InputState.h"
-#include "editor_music.h"
-#include "uniform.h"
+#include "editor/CameraController.h"
+#include "editor/CameraKeyframeController.h"
+#include "editor/InputState.h"
+#include "editor/editor_music.h"
+#include "editor/uniform.h"
 #include <regex>
 #include <set>
 #include "imgui/imgui_benzene_widgets.h"
-#include "config.h"
-#include "keyframe_marker.h"
-#include "window_renderer.h"
-#include "debug_window.h"
-#include "save_dialog.h"
-#include "uniform_editor.h"
-#include "timeline.h"
+#include "editor/config.h"
+#include "editor/components/keyframe_marker.h"
+#include "editor/window_renderer.h"
+#include "editor/components/debug_window.h"
+#include "editor/components/save_dialog.h"
+#include "editor/uniform_editor.h"
+#include "editor/timeline.h"
 
 CameraKeyframeController cameraController;
 const char* configFileName = "config.json";

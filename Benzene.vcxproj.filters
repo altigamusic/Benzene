@@ -24,9 +24,7 @@
     <ClCompile Include="src\imgui\imgui_widgets.cpp">
       <Filter>ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="src\CameraController.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\uniform.cpp" />
     <ClCompile Include="src\imgui\imgui_benzene_widgets.cpp">
       <Filter>ImGui</Filter>
     </ClCompile>
@@ -34,11 +32,42 @@
     <ClCompile Include="src\generated\release.cpp">
       <Filter>Auto-Generated</Filter>
     </ClCompile>
-    <ClCompile Include="src\CameraKeyframeController.cpp" />
-    <ClCompile Include="src\config.cpp" />
-    <ClCompile Include="src\keyframe_marker.cpp" />
-    <ClCompile Include="src\editor_music.cpp" />
-    <ClCompile Include="src\InputState.cpp" />
+    <ClCompile Include="src\editor\CameraController.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\CameraKeyframeController.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\config.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\editor_music.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\InputState.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\timeline.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\uniform.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\uniform_editor.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\window_renderer.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\components\debug_window.cpp">
+      <Filter>Editor\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\components\keyframe_marker.cpp">
+      <Filter>Editor\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\components\save_dialog.cpp">
+      <Filter>Editor\Components</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ext.h" />
@@ -71,20 +100,53 @@
     <ClInclude Include="src\imgui\imstb_truetype.h">
       <Filter>ImGui</Filter>
     </ClInclude>
-    <ClInclude Include="src\CameraController.h" />
-    <ClInclude Include="src\uniform.h" />
     <ClInclude Include="src\imgui\imgui_benzene_widgets.h">
       <Filter>ImGui</Filter>
     </ClInclude>
     <ClInclude Include="src\uniform_data_types.h" />
     <ClInclude Include="src\release.h" />
-    <ClInclude Include="src\editor_music.h" />
-    <ClInclude Include="src\CameraKeyframeController.h" />
-    <ClInclude Include="src\config.h" />
-    <ClInclude Include="src\generated\release_config.h" />
-    <ClInclude Include="src\nlohmann\json.hpp" />
-    <ClInclude Include="src\keyframe_marker.h" />
-    <ClInclude Include="src\InputState.h" />
+    <ClInclude Include="src\editor\CameraController.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\CameraKeyframeController.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\config.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\editor_music.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\InputState.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\nlohmann\json.hpp">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\timeline.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\uniform.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\uniform_editor.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\window_renderer.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\generated\release_config.h">
+      <Filter>Auto-Generated</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\components\debug_window.h">
+      <Filter>Editor\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\components\keyframe_marker.h">
+      <Filter>Editor\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\components\save_dialog.h">
+      <Filter>Editor\Components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ImGui">
@@ -92,6 +154,12 @@
     </Filter>
     <Filter Include="Auto-Generated">
       <UniqueIdentifier>{d1c3c07c-2d5f-40ef-a1ba-d4564d0e76db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{1386af66-f42f-423f-beec-5eb8cb966565}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Editor\Components">
+      <UniqueIdentifier>{e700f37d-17ac-49d1-9975-e923455411c7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

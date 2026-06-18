@@ -1,10 +1,10 @@
 #pragma once
-#include "ext.h"
+#include "../ext.h"
 #include "uniform.h"
 #include <string>
 #include <vector>
 
-#include "debug_window.h"
+#include "components/debug_window.h"
 
 class CameraKeyframeController;
 

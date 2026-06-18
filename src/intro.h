@@ -3,7 +3,7 @@
 #include "ext.h"
 
 #ifdef EDITOR
-#include "window_renderer.h"
+#include "editor/window_renderer.h"
 extern WindowRenderer windowRenderer;
 
 #define WINDOW_WIDTH windowRenderer.windowWidth

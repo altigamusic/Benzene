@@ -1,5 +1,5 @@
 #include "debug_window.h"
-#include "imgui/imgui.h"
+#include "../../imgui/imgui.h"
 
 void DebugWindow::open(const std::string& newError)
 {

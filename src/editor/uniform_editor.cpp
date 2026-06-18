@@ -1,7 +1,7 @@
 #include "uniform_editor.h"
-#include "imgui/imgui.h"
-#include "imgui/imgui_benzene_widgets.h"
-#include "keyframe_marker.h"
+#include "../imgui/imgui.h"
+#include "../imgui/imgui_benzene_widgets.h"
+#include "components/keyframe_marker.h"
 #include <algorithm>
 
 std::optional<std::string> nameDialog(const char* str_id)

@@ -7,10 +7,10 @@
 
 struct BenzeneConfig
 {
-    float bpm;
-    float lengthInBeats;
-    int resolutionX;
-    int resolutionY;
+    float bpm = 120;
+    float lengthInBeats = 100;
+    int resolutionX = 800;
+    int resolutionY = 600;
     int shaderQuantizationDigits = 6;
     std::vector<Uniform> uniformList;
     std::optional<Uniform> cameraPosition;

@@ -1,8 +1,8 @@
 
 #include "CameraKeyframeController.h"
-#include "imgui/imgui.h"
-#include "imgui/imgui_benzene_widgets.h"
-#include "keyframe_marker.h"
+#include "../imgui/imgui.h"
+#include "../imgui/imgui_benzene_widgets.h"
+#include "components/keyframe_marker.h"
 
 CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", UniformType::Vec3), rotationUniform("_cr", UniformType::Vec2)
 {
@@ -112,7 +112,7 @@ void CameraKeyframeController::displayKeyframeMarker()
             rotationUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getRotationValue(), interpolation, tension);
         }
 
-        if (shouldSplitToDual)
+        if (shouldSplitToDual && kf != nullptr)
         {
             UniformValue splitPositionValue = isKeyframe ? kf->value : getPositionValue();
             UniformKeyframe* rotationKf = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);

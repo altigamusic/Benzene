@@ -1,7 +1,7 @@
 #pragma once
 
 #include "InputState.h"
-#include "intro.h"
+#include "../intro.h"
 #include <math.h>
 
 typedef struct _vec3

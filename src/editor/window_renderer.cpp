@@ -1,9 +1,9 @@
 #define WIN32_LEAN_AND_MEAN
 #define WIN32_EXTRA_LEAN
 #include "window_renderer.h"
-#include "debug_window.h"
+#include "components/debug_window.h"
 #include "CameraKeyframeController.h"
-#include "intro.h"
+#include "../intro.h"
 #include <algorithm>
 #include <fstream>
 #include <regex>
