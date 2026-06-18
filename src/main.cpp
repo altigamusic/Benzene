@@ -438,10 +438,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     float timelineViewStart = 0.0f;
     float timelineViewEnd = demoTimeLength;
 
-    long prevSystemTime = timeGetTime();
-    long playStartSystemTime = prevSystemTime;
-    long fpsStartSystemTime = prevSystemTime;
-    long currentSystemTime = 0;
+    long long prevSystemTime = timeGetTime();
+    long long playStartSystemTime = prevSystemTime;
+    long long fpsStartSystemTime = prevSystemTime;
+    long long currentSystemTime = 0;
 
     float timeInBeats = 0;   // The current time, in beats
     float playStartTime = 0; // The time at which playback started, in beats
@@ -451,7 +451,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
     while (!done)
     {
-        currentSystemTime = timeGetTime();
+        currentSystemTime = (unsigned long)timeGetTime();
 
         long timeDeltaMs = currentSystemTime - prevSystemTime;
         prevSystemTime = currentSystemTime;
@@ -572,8 +572,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         prevShouldRerender = shouldRerender;
 
-        if (saveDialog.render(done))
-            saveConfigToFile(configFileName);
+        if (saveDialog.render(done)) saveConfigToFile(configFileName);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
