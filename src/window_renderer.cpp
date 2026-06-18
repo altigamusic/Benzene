@@ -17,23 +17,23 @@ std::string WindowRenderer::generateUniformCode(const std::vector<Uniform>& unif
         switch (uniform.type)
         {
         case UniformType::Float:
-            uniformStream << "uniform float " << uniform.name << ";\n";
+            uniformStream << "uniform float " << uniform.name << ";";
             break;
         case UniformType::Int:
-            uniformStream << "uniform int " << uniform.name << ";\n";
+            uniformStream << "uniform int " << uniform.name << ";";
             break;
         case UniformType::Bool:
-            uniformStream << "uniform bool " << uniform.name << ";\n";
+            uniformStream << "uniform bool " << uniform.name << ";";
             break;
         case UniformType::Vec2:
-            uniformStream << "uniform vec2 " << uniform.name << ";\n";
+            uniformStream << "uniform vec2 " << uniform.name << ";";
             break;
         case UniformType::Vec3:
         case UniformType::Color:
-            uniformStream << "uniform vec3 " << uniform.name << ";\n";
+            uniformStream << "uniform vec3 " << uniform.name << ";";
             break;
         case UniformType::Vec4:
-            uniformStream << "uniform vec4 " << uniform.name << ";\n";
+            uniformStream << "uniform vec4 " << uniform.name << ";";
             break;
         }
     }
@@ -94,11 +94,11 @@ void WindowRenderer::loadInternal(
 
     std::string source =
         "#version 330\n"
-        "uniform vec2 _res, _windowOffset;\n"
-        "uniform float _t;\n"
-        "uniform vec3 _cp, _ct, _cr;\n"
-        "vec2 fragCoord = gl_FragCoord.xy - _windowOffset;\n" +
-        generateUniformCode(uniformList) + fragmentShaderSource;
+        "uniform vec2 _res, _windowOffset;"
+        "uniform float _t;"
+        "uniform vec3 _cp, _ct, _cr;"
+        "vec2 fragCoord = gl_FragCoord.xy - _windowOffset;" +
+        generateUniformCode(uniformList) + "\n" + fragmentShaderSource;
 
     const char* srcPtr = source.c_str();
     program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &srcPtr);
