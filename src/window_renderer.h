@@ -4,11 +4,16 @@
 #include <string>
 #include <vector>
 
+#include "debug_window.h"
+
 class CameraKeyframeController;
 
+/// <summary>
+/// Responsible for managing all shader-related operations, as well as handling window resizing and dimensions.
+/// </summary>
 struct WindowRenderer
 {
-    std::string lastError;
+    WindowRenderer(DebugWindow& debugWindow) : debugWindow(debugWindow) {}
 
     int sidebarWidth = 0;
     int sidebarHeight = 0;
@@ -37,6 +42,8 @@ struct WindowRenderer
     GLuint cameraTargetLocation = (GLuint)-1;
     GLuint cameraRotationLocation = (GLuint)-1;
     std::string currentShader;
+
+    DebugWindow& debugWindow;
 
     std::string generateUniformCode(const std::vector<Uniform>& uniformList);
     std::vector<std::string> getUndeclaredIdentifiers(const std::string& error);

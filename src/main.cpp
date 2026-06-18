@@ -25,6 +25,7 @@
 #include "config.h"
 #include "keyframe_marker.h"
 #include "window_renderer.h"
+#include "debug_window.h"
 #include "uniform_editor.h"
 #include "timeline.h"
 
@@ -45,8 +46,9 @@ float loopStartTime = 0.0f;
 float loopEndTime = 140.0f;
 bool shouldPlayMusic = true;
 
-bool showDebugWindow = false;
-std::string debugError;
+DebugWindow debugWindow;
+WindowRenderer windowRenderer(debugWindow);
+
 bool showSettingsWindow = false;
 
 bool isPlaying = true;
@@ -55,24 +57,10 @@ bool isEndKeyframe = true;
 KeyboardState keyboardState;
 MouseState mouseState;
 
-WindowRenderer windowRenderer;
-
 std::vector<Uniform> uniformList;
 
 std::vector<std::string> groups;
 std::string currentGroup;
-
-void openDebugWindow(const std::string& error)
-{
-    debugError += error + "\n";
-    showDebugWindow = true;
-}
-
-void closeDebugWindow()
-{
-    debugError = "";
-    showDebugWindow = false;
-}
 
 void updateUniforms(const float ftime)
 {
@@ -253,7 +241,7 @@ void loadConfigFromFile(const std::string& filename)
     }
     catch (const std::exception& e)
     {
-        openDebugWindow(e.what());
+        debugWindow.open(e.what());
     }
 }
 
@@ -271,17 +259,7 @@ void saveConfigToFile(const std::string& filename)
     }
     catch (const std::exception& e)
     {
-        openDebugWindow(e.what());
-    }
-}
-
-void renderDebugWindow()
-{
-    if (ImGui::Begin("Shader Debug", &showDebugWindow))
-    {
-        ImGui::TextUnformatted(debugError.c_str());
-        ImGui::End();
-        if (!showDebugWindow) closeDebugWindow();
+        debugWindow.open(e.what());
     }
 }
 
@@ -380,10 +358,6 @@ bool renderMenuBar()
             {
                 loadConfigFromFile(configFileName);
                 windowRenderer.reload(uniformList, currentGroup);
-                if (!windowRenderer.lastError.empty())
-                    openDebugWindow(windowRenderer.lastError);
-                else
-                    closeDebugWindow();
                 didChange = true;
             }
             if (ImGui::MenuItem("Save Uniforms"))
@@ -513,7 +487,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
         if (showSettingsWindow) renderSettingsWindow();
-        if (showDebugWindow) renderDebugWindow();
+        debugWindow.render();
 
         cameraController.updateCamera(timeDeltaMs, keyboardState, mouseState);
 
@@ -556,13 +530,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             shouldRerender = true;
 
         if (shouldReloadFragmentShader)
-        {
             windowRenderer.reload(uniformList, currentGroup);
-            if (!windowRenderer.lastError.empty())
-                openDebugWindow(windowRenderer.lastError);
-            else
-                closeDebugWindow();
-        }
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
@@ -582,14 +550,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         // Try reloading the file
         // TODO: Maybe change the way this is done or something
         bool didReload = windowRenderer.reloadFromFile(uniformList, currentGroup);
-        if (didReload)
-        {
-            if (!windowRenderer.lastError.empty())
-                openDebugWindow(windowRenderer.lastError);
-            else
-                closeDebugWindow();
-        }
-
         shouldRerender |= didReload;
 
         EditorMusic::Update(isPlaying && shouldPlayMusic, timeInBeats, static_cast<float>(bpm));

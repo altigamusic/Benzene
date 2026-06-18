@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define WIN32_EXTRA_LEAN
 #include "window_renderer.h"
+#include "debug_window.h"
 #include "CameraKeyframeController.h"
 #include "intro.h"
 #include <algorithm>
@@ -123,11 +124,11 @@ void WindowRenderer::loadInternal(
             return loadInternal(fragmentShaderSource, uniformList, currentGroup, true);
         }
 
-        lastError = error;
+        debugWindow.open(error);
         return;
     }
 
-    lastError.clear();
+    debugWindow.close();
 
     timeLocation = glGetUniformLocation(program, "_t");
     resolutionLocation = glGetUniformLocation(program, "_res");
