@@ -294,7 +294,7 @@ void renderSettingsWindow()
 /// </summary>
 /// <param name="t">The current time, in beats. Modified if the prev/next buttons are clicked.</param>
 /// <param name="info">Used for opening a file dialog if the user wants to choose a music file.</param>
-bool renderToolbar(float& t, WININFO* info)
+static bool renderToolbar(float& t, WININFO* info)
 {
     bool shouldRerender = false;
 
@@ -347,33 +347,33 @@ bool renderToolbar(float& t, WININFO* info)
     return shouldRerender;
 }
 
-bool renderMenuBar()
+static bool renderMenuBar()
 {
     bool didChange = false;
 
-    if (ImGui::BeginMenuBar())
-    {
-        if (ImGui::BeginMenu("File"))
-        {
-            if (ImGui::MenuItem("Reload Uniforms From File"))
-            {
-                loadConfigFromFile(configFileName);
-                windowRenderer.reload(uniformList, currentGroup);
-                didChange = true;
-            }
-            if (ImGui::MenuItem("Save Uniforms"))
-            {
-                saveConfigToFile(configFileName);
-            }
-            if (ImGui::MenuItem("Settings"))
-            {
-                showSettingsWindow = true;
-            }
+    if (!ImGui::BeginMenuBar()) return false;
 
-            ImGui::EndMenu();
+    if (ImGui::BeginMenu("File"))
+    {
+        if (ImGui::MenuItem("Reload Uniforms From File"))
+        {
+            loadConfigFromFile(configFileName);
+            windowRenderer.reload(uniformList, currentGroup);
+            didChange = true;
         }
-        ImGui::EndMenuBar();
+        if (ImGui::MenuItem("Save Uniforms"))
+        {
+            saveConfigToFile(configFileName);
+        }
+        if (ImGui::MenuItem("Settings"))
+        {
+            showSettingsWindow = true;
+        }
+
+        ImGui::EndMenu();
     }
+
+    ImGui::EndMenuBar();
 
     return didChange;
 }
@@ -530,8 +530,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
                 windowRenderer.sidebarHeight)) // The function will pause if necessary
             shouldRerender = true;
 
-        if (shouldReloadFragmentShader)
-            windowRenderer.reload(uniformList, currentGroup);
+        if (shouldReloadFragmentShader) windowRenderer.reload(uniformList, currentGroup);
 
         cameraController.displayImGuiWindow();
         shouldRerender |= cameraController.didCameraMove();
@@ -549,7 +548,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::End();
 
         // Try reloading the file
-        // TODO: Maybe change the way this is done or something
         bool didReload = windowRenderer.reloadFromFile(uniformList, currentGroup);
         shouldRerender |= didReload;
 
