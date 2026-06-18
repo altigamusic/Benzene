@@ -232,7 +232,8 @@ bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& i
             keyframes.push_back(keyframe.time);
 
         KeyframeMovementData kfMovement;
-        bool sliderChanged = KeyframeSlider("Camera", &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement);
+        bool sliderChanged =
+            KeyframeSlider("Camera", &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement, loopStart, loopEnd);
 
         if (kfMovement.index >= 0)
         {
@@ -294,7 +295,8 @@ bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& i
 
         KeyframeMovementData kfMovement;
 
-        bool sliderChanged = KeyframeSlider(uniform.name.c_str(), &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement);
+        bool sliderChanged = KeyframeSlider(
+            uniform.name.c_str(), &timeInBeats, &isEndKeyframe, minTime, maxTime, keyframes, &kfMovement, loopStart, loopEnd);
 
         if (kfMovement.index >= 0)
         {

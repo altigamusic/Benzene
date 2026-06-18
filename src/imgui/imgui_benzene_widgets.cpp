@@ -15,6 +15,8 @@
 
 using namespace ImGui;
 
+const ImGuiCol SELECTION_COLOR = IM_COL32(50, 100, 200, 60);
+
 static bool InvisibleButton(const char* str_id, const ImVec2& size_arg, bool* hovered, bool* held, ImGuiButtonFlags flags = 0)
 {
     ImGuiContext& g = *GImGui;
@@ -88,8 +90,8 @@ bool DragVector2(
     return value_changed;
 }
 
-bool KeyframeSlider(
-    const char* label, float* data, bool* isEnd, float min, float max, const std::vector<float>& keyframes, KeyframeMovementData* movement)
+bool KeyframeSlider(const char* label, float* data, bool* isEnd, float min, float max, const std::vector<float>& keyframes,
+    KeyframeMovementData* movement, float* loopStart, float* loopEnd)
 {
     const ImU32 TIMELINE_COLOR = GetColorU32(ImGuiCol_FrameBg);
     const ImU32 CURRENT_TIME_COLOR = GetColorU32(ImGuiCol_SliderGrab);
@@ -178,6 +180,16 @@ bool KeyframeSlider(
     // Render timeline
     ImDrawList* draw_list = GetWindowDrawList();
     draw_list->AddLine(pos + ImVec2(0, size.y * 0.5f), pos + ImVec2(size.x, size.y * 0.5f), TIMELINE_COLOR, 4.0f);
+
+    // Render loop region
+    if (loopStart != nullptr && loopEnd != nullptr && max > min)
+    {
+        float startRatio = ImClamp((*loopStart - min) / (max - min), 0.0f, 1.0f);
+        float endRatio = ImClamp((*loopEnd - min) / (max - min), 0.0f, 1.0f);
+        float regionStartX = pos.x + startRatio * size.x;
+        float regionEndX = pos.x + endRatio * size.x;
+        draw_list->AddRectFilled(ImVec2(regionStartX, pos.y - 2), ImVec2(regionEndX, pos.y + size.y + 2), SELECTION_COLOR);
+    }
 
     // Render current value indicator
     if (*data >= min && *data <= max)
@@ -306,6 +318,13 @@ bool TimeSlider(const char* label, float* data, bool* isEnd, float min, float ma
             draggedElement = (hasLoopMarkers && startMarkerBB.Contains(GetIO().MousePos)) ? 1
                              : (hasLoopMarkers && endMarkerBB.Contains(GetIO().MousePos)) ? 2
                                                                                           : 0;
+            if (ImGui::GetIO().KeyCtrl && loopStart != nullptr && loopEnd != nullptr)
+            {
+                // Ctrl-drag should mark the selection
+                *loopStart = ImClamp(roundf(mouseValue), 0.0f, max);
+                *loopEnd = *loopStart;
+                draggedElement = 2;
+            }
         }
         else
         {
@@ -387,6 +406,12 @@ bool TimeSlider(const char* label, float* data, bool* isEnd, float min, float ma
             draw_list->AddLine(top, center, markerColor, 2.0f);
             draw_list->AddLine(center, bottom, markerColor, 2.0f);
         }
+
+        float startRatio = ImClamp((*loopStart - min) / (max - min), 0.0f, 1.0f);
+        float endRatio = ImClamp((*loopEnd - min) / (max - min), 0.0f, 1.0f);
+        float regionStartX = pos.x + startRatio * size.x;
+        float regionEndX = pos.x + endRatio * size.x;
+        draw_list->AddRectFilled(ImVec2(regionStartX, pos.y - 2), ImVec2(regionEndX, pos.y + size.y + 2), SELECTION_COLOR);
     }
 
     // Render current value indicator
@@ -404,8 +429,11 @@ bool TimeSlider(const char* label, float* data, bool* isEnd, float min, float ma
     }
 
     // Render time
-    char buf[64];
-    ImFormatString(buf, IM_ARRAYSIZE(buf), "%.3f", *data);
+    char buf[128];
+    if (loopStart == nullptr || loopEnd == nullptr)
+        ImFormatString(buf, IM_ARRAYSIZE(buf), "%.3f", *data);
+    else
+        ImFormatString(buf, IM_ARRAYSIZE(buf), "%.3f (selection: %.0f-%.0f)", *data, *loopStart, *loopEnd);
 
     ImVec2 value_pos = pos + ImVec2(size.x + g.Style.FramePadding.x, g.Style.FramePadding.y);
     draw_list->AddText(value_pos, GetColorU32(ImGuiCol_Text), buf);
