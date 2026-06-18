@@ -95,6 +95,12 @@
     <ClCompile Include="src\editor\actions\DeleteKeyframe.cpp">
       <Filter>Editor\Actions</Filter>
     </ClCompile>
+    <ClCompile Include="src\editor\actions\DeleteTime.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor\actions\InsertTime.cpp">
+      <Filter>Editor\Actions</Filter>
+    </ClCompile>
     <ClCompile Include="src\editor\actions\DeleteUniform.cpp">
       <Filter>Editor\Actions</Filter>
     </ClCompile>

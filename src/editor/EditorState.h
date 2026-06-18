@@ -14,4 +14,12 @@ struct EditorState
     BenzeneConfig toConfig() const;
     void fromConfig(BenzeneConfig config);
     Uniform* findUniform(const std::string& name);
+
+    template <typename F> void forEachUniform(F&& fn)
+    {
+        for (Uniform& u : config.uniformList)
+            fn(u);
+        fn(cameraController.positionUniform);
+        fn(cameraController.rotationUniform);
+    }
 };

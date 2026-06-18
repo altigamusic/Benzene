@@ -31,6 +31,9 @@
 #include "editor/timeline.h"
 #include "editor/EditorState.h"
 #include "editor/ActionHistory.h"
+#include "editor/actions/InsertTime.h"
+#include "editor/actions/DeleteTime.h"
+#include <memory>
 
 EditorState editorState;
 ActionHistory actionHistory;
@@ -423,6 +426,18 @@ static bool handleKeyboard(const KeyboardState& keyboard, float& t)
         shouldRerender = true;
     }
 
+    if (isAbLooping && keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed(VK_INSERT))
+    {
+        actionHistory.execute(std::make_unique<InsertTime>(loopStartTime, loopEndTime - loopStartTime), editorState);
+        shouldRerender = true;
+    }
+
+    if (isAbLooping && keyboard.isDown(VK_CONTROL) && keyboard.wasKeyPressed(VK_DELETE))
+    {
+        actionHistory.execute(std::make_unique<DeleteTime>(loopStartTime, loopEndTime - loopStartTime), editorState);
+        shouldRerender = true;
+    }
+
     if (handleKeyScrubbing(keyboard, t, isEndKeyframe, (int)editorState.config.lengthInBeats, editorState.config.uniformList,
             editorState.cameraController))
     {
@@ -535,7 +550,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         if (renderTimelines(timeInBeats, timelineViewStart, timelineViewEnd, isEndKeyframe, editorState.config.uniformList,
                 editorState.cameraController, editorState.currentGroup, editorState.config.lengthInBeats, actionHistory,
-                isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
+                editorState, isAbLooping ? &loopStartTime : nullptr, isAbLooping ? &loopEndTime : nullptr))
         {
             shouldRerender = true;
             frames = -1;

@@ -2,10 +2,14 @@
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_benzene_widgets.h"
 #include "ActionHistory.h"
+#include "EditorState.h"
 #include "actions/MoveKeyframe.h"
 #include "actions/MoveCameraKeyframe.h"
+#include "actions/InsertTime.h"
+#include "actions/DeleteTime.h"
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -212,7 +216,7 @@ bool isEndHalfOfDualAfterMove(int index, float newTime, const std::vector<float>
 
 bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
     CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, ActionHistory& actionHistory,
-    float* loopStart, float* loopEnd)
+    EditorState& editorState, float* loopStart, float* loopEnd)
 {
     bool didChange = false;
 
@@ -221,6 +225,15 @@ bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& i
 
     ZoomPanSlider("Zoom", &minTime, &maxTime, 0.0f, demoTimeLength);
     didChange |= TimeSlider("Time", &timeInBeats, &isEndKeyframe, minTime, maxTime, loopStart, loopEnd);
+
+    if (loopStart && loopEnd && ImGui::BeginPopupContextItem("Time Menu"))
+    {
+        if (ImGui::MenuItem("Insert time", "Ctrl-Ins"))
+            actionHistory.execute(std::make_unique<InsertTime>(*loopStart, *loopEnd - *loopStart), editorState);
+        if (ImGui::MenuItem("Delete time", "Ctrl-Del"))
+            actionHistory.execute(std::make_unique<DeleteTime>(*loopStart, *loopEnd - *loopStart), editorState);
+        ImGui::EndPopup();
+    }
 
     if (cameraController.positionUniform.keyframes.size() > 1)
     {

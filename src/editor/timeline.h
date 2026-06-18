@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+struct EditorState;
 class ActionHistory;
 
 bool scrubToPreviousKeyframe(
@@ -35,4 +36,4 @@ bool handleKeyScrubbing(const KeyboardState& keyboard, float& t, bool& isEndKeyf
 /// <returns>True if the time has changed from user input, false if nothing was altered.</returns>
 bool renderTimelines(float& timeInBeats, float& minTime, float& maxTime, bool& isEndKeyframe, std::vector<Uniform>& uniformList,
     CameraKeyframeController& cameraController, const std::string& currentGroup, float demoTimeLength, ActionHistory& actionHistory,
-    float* loopStart = nullptr, float* loopEnd = nullptr);
+    EditorState& editorState, float* loopStart = nullptr, float* loopEnd = nullptr);
