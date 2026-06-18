@@ -62,7 +62,11 @@ bool renderSingleUniformTab(const std::string& group, float time, bool isEndKeyf
             didThisUniformChange = ImGui::Checkbox(uniform.name.c_str(), &value.b);
             break;
         case UniformType::Vec2:
-            didThisUniformChange = DragVector2(uniform.name.c_str(), (ImVec2*)(&value.v2), 0.005f);
+            ImGui::SetNextItemWidth(ImGui::CalcItemWidth() / 2.);
+            didThisUniformChange = ImGui::DragFloat(("##XComp" + uniform.name).c_str(), value.v2, 0.005f);
+            ImGui::SetNextItemWidth(ImGui::CalcItemWidth() / 2.);
+            ImGui::SameLine();
+            didThisUniformChange |= ImGui::DragFloat(uniform.name.c_str(), value.v2 + 1, 0.005f);
             break;
         case UniformType::Color:
             didThisUniformChange = ImGui::ColorEdit3(uniform.name.c_str(), value.v3);
