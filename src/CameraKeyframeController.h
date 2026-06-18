@@ -21,12 +21,9 @@ class CameraKeyframeController
     CameraKeyframeController();
     void startFrame(float currentTime, bool isEnd);
     void displayImGuiWindow();
-    void updateCamera(long timeDeltaMs);
+    void updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse);
 
     void recalculateCameraTarget();
-    void handleKeyDown(WPARAM wParam);
-    void handleKeyUp(WPARAM wParam);
-    void handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam);
     void forceMovement();
     bool didCameraMove() const;
 

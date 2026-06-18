@@ -1,7 +1,7 @@
 #pragma once
 
+#include "InputState.h"
 #include "intro.h"
-#include "windows.h"
 #include <math.h>
 
 typedef struct _vec3
@@ -41,11 +41,7 @@ typedef struct _vec3
         return {y * other.z - z * other.y, z * other.x - x * other.z, x * other.y - y * other.x};
     }
 
-    inline _vec3 normalize()
-    {
-        // Normalize
-        return *this * (1.0f / sqrt(x * x + y * y + z * z));
-    }
+    inline _vec3 normalize() { return *this * (1.0f / sqrt(x * x + y * y + z * z)); }
 } vec3;
 
 typedef struct _vec4
@@ -60,6 +56,8 @@ class CameraController
 {
   private:
     bool _didCameraMove = false;
+    float _dragStartXAngle = 0;
+    float _dragStartYAngle = 0;
 
   public:
     vec3 position = {};
@@ -69,7 +67,6 @@ class CameraController
     float yAngle = 0;
     float movementX = 0, movementY = 0, movementZ = 0, movementToTarget = 0;
     float movementScale = 10;
-    bool isCtrlDown = false;
 
     constexpr static float ANGLE_SCALE = 0.003f;
 
@@ -85,10 +82,6 @@ class CameraController
 
     void resetCamera();
 
-    void handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam);
-    void handleKeyDown(WPARAM wParam);
-    void handleKeyUp(WPARAM wParam);
-
     void moveForward(float amount);
 
     void moveToTarget(float amount);
@@ -97,7 +90,7 @@ class CameraController
 
     void moveUp(float amount);
 
-    void updateCamera(long timeDeltaMs);
+    void updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse);
 
     void resetCameraMovementCheck();
     void markAsMoved();

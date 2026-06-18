@@ -57,49 +57,6 @@ void CameraController::resetCamera()
     _didCameraMove = true;
 }
 
-void CameraController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    static POINTS start;
-    static float startXAngle;
-    static float startYAngle;
-
-    float xDiff, yDiff;
-
-    switch (uMsg)
-    {
-    case WM_LBUTTONDOWN:
-        SetCapture(hwndMain);
-        start = MAKEPOINTS(lParam);
-        startXAngle = xAngle;
-        startYAngle = yAngle;
-        break;
-    case WM_MOUSEMOVE:
-        if (!(wParam & MK_LBUTTON)) break;
-
-        _didCameraMove = true;
-        POINTS currentPoint = MAKEPOINTS(lParam);
-
-        xDiff = (float)(currentPoint.x - start.x);
-        yDiff = (float)(currentPoint.y - start.y);
-
-        xAngle = startXAngle + xDiff * ANGLE_SCALE;
-        yAngle = startYAngle + yDiff * ANGLE_SCALE;
-
-        yAngle = min(max(yAngle, -PI / 2), PI / 2);
-
-        // Orbit if ctrl is down
-        if (isCtrlDown)
-            recalculateCameraPosition();
-        else
-            recalculateCameraTarget();
-        break;
-    case WM_LBUTTONUP:
-        ClipCursor(NULL);
-        ReleaseCapture();
-        break;
-    }
-}
-
 void CameraController::moveForward(float amount)
 {
     vec3 direction = getCameraDirection();
@@ -139,73 +96,41 @@ void CameraController::moveUp(float amount)
     recalculateCameraTarget();
 }
 
-void CameraController::updateCamera(long timeDeltaMs)
+void CameraController::updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse)
 {
+    bool isCtrlDown = keyboard.isDown(VK_CONTROL);
+    movementToTarget = keyboard.getMovementForwards() * movementScale;
+    movementX = keyboard.getMovementX() * movementScale;
+    movementY = keyboard.getMovementY() * movementScale;
+    movementZ = keyboard.getMovementZ() * movementScale;
+
+    if (mouse.wasPressed)
+    {
+        _dragStartXAngle = xAngle;
+        _dragStartYAngle = yAngle;
+    }
+
+    if (mouse.isDragging)
+    {
+        _didCameraMove = true;
+        float xDiff = (float)(mouse.pos.x - mouse.dragStart.x);
+        float yDiff = (float)(mouse.pos.y - mouse.dragStart.y);
+
+        xAngle = _dragStartXAngle + xDiff * ANGLE_SCALE;
+        yAngle = _dragStartYAngle + yDiff * ANGLE_SCALE;
+        yAngle = min(max(yAngle, -PI / 2), PI / 2);
+
+        if (isCtrlDown)
+            recalculateCameraPosition();
+        else
+            recalculateCameraTarget();
+    }
+
     float timeDelta = ((float)timeDeltaMs) / 1000.0f;
     moveToTarget(movementToTarget * timeDelta);
     moveLeft(movementX * timeDelta);
     moveUp(movementY * timeDelta);
     moveForward(movementZ * timeDelta);
-}
-
-void CameraController::handleKeyDown(WPARAM wParam)
-{
-    switch (wParam)
-    {
-    case 'W':
-        movementToTarget = movementScale;
-        break;
-    case 'S':
-        movementToTarget = -movementScale;
-        break;
-    case 'A':
-        movementX = movementScale;
-        break;
-    case 'D':
-        movementX = -movementScale;
-        break;
-    case 'Q':
-        movementY = movementScale;
-        break;
-    case 'E':
-        movementY = -movementScale;
-        break;
-    case 'R':
-        movementZ = movementScale;
-        break;
-    case 'F':
-        movementZ = -movementScale;
-        break;
-    case VK_CONTROL:
-        isCtrlDown = true;
-        break;
-    }
-}
-
-void CameraController::handleKeyUp(WPARAM wParam)
-{
-    switch (wParam)
-    {
-    case 'W':
-    case 'S':
-        movementToTarget = 0;
-        break;
-    case 'A':
-    case 'D':
-        movementX = 0;
-        break;
-    case 'Q':
-    case 'E':
-        movementY = 0;
-        break;
-    case 'R':
-    case 'F':
-        movementZ = 0;
-        break;
-    case VK_CONTROL:
-        isCtrlDown = false;
-        break;
-    }
 }
 
 void CameraController::resetCameraMovementCheck() { _didCameraMove = false; }

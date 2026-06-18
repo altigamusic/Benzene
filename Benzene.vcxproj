@@ -99,6 +99,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release (No Generate)|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="src\InputState.cpp" />
     <ClCompile Include="src\intro.cpp" />
     <ClCompile Include="src\keyframe_marker.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -219,6 +220,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release (No Generate)|Win32'">true</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="src\InputState.h" />
     <ClInclude Include="src\intro.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug (No Generate)|Win32'">false</ExcludedFromBuild>

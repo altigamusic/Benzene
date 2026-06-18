@@ -16,6 +16,7 @@
 #include <windows.h>
 #include "CameraController.h"
 #include "CameraKeyframeController.h"
+#include "InputState.h"
 #include "editor_music.h"
 #include "uniform.h"
 #include <regex>
@@ -66,8 +67,10 @@ std::string debugError;
 bool showSettingsWindow = false;
 
 bool isPlaying = true;
-bool isSpaceDown;
 bool isEndKeyframe = true;
+
+KeyboardState keyboardState;
+MouseState mouseState;
 
 static GLuint fragmentShaderProgram = 0;
 static GLuint timeLocation;
@@ -356,37 +359,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         wantCaptureKeyboard = io.WantCaptureKeyboard;
     }
 
-    if (!wantCaptureKeyboard)
-    {
-        if (uMsg == WM_KEYDOWN)
-        {
-            if (wParam == VK_ESCAPE)
-            {
-                PostQuitMessage(0);
-                return 0;
-            }
-            else if (wParam == VK_F1)
-            {
-                showDemoWindow = true;
-            }
-            else if (wParam == VK_SPACE && !isSpaceDown)
-            {
-                // Prevent holding space from retriggering a bunch of times
-                isSpaceDown = true;
-                isPlaying = !isPlaying;
-            }
-
-            cameraController.handleKeyDown(wParam);
-        }
-
-        if (uMsg == WM_KEYUP)
-        {
-            if (wParam == VK_SPACE) isSpaceDown = false;
-            cameraController.handleKeyUp(wParam);
-        }
-    }
-
-    if (!wantCaptureMouse) cameraController.handleMouseMovement(hWnd, uMsg, wParam, lParam);
+    if (!wantCaptureKeyboard) keyboardState.onMessage(uMsg, wParam);
+    if (!wantCaptureMouse) mouseState.onMessage(hWnd, uMsg, wParam, lParam);
 
     return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
@@ -867,6 +841,17 @@ float getSnappedKeyframePosition(KeyframeMovementData& kfMovement, float maxTime
     return std::round(std::clamp(kfMovement.newTime, minValue, maxValue));
 }
 
+/// <summary>
+/// Renders timelines for all uniforms.
+/// Also handles user input for moving keyframes, zooming/panning the timeline, and scrubbing.
+/// Returns true if the time has changed from user input.
+/// </summary>
+/// <param name="time">The current time. Modified if the user scrubs or moves a keyframe.</param>
+/// <param name="minTime">The start point to draw the timelines from. Modified if the user zooms or pans.</param>
+/// <param name="maxTime">The end point to draw the timelines to. Modified if the user zooms or pans.</param>
+/// <param name="loopStart">The start of the loop, nullptr if there's no loop. Modified if the user moves the loop points.</param>
+/// <param name="loopEnd">The end of the loop, nullptr if there's no loop. Modified if the user moves the loop points.</param>
+/// <returns>True if the time has changed from user input, false if nothing was altered.</returns>
 bool renderTimelines(float* time, float& minTime, float& maxTime, float* loopStart = nullptr, float* loopEnd = nullptr)
 {
     bool didChange = false;
@@ -1072,9 +1057,11 @@ void renderSettingsWindow()
     ImGui::End();
 }
 
-/// @brief Render the toolbar, and run button functions if clicked.
-/// @param t The current time, in beats. Modified if the prev/next buttons are clicked.
-/// @param info Used for opening a file dialog if the user wants to choose a music file.
+/// <summary>
+/// Render the toolbar, and run button functions if clicked.
+/// </summary>
+/// <param name="t">The current time, in beats. Modified if the prev/next buttons are clicked.</param>
+/// <param name="info">Used for opening a file dialog if the user wants to choose a music file.</param>
 bool renderToolbar(float& t, WININFO* info)
 {
     bool shouldRerender = false;
@@ -1153,6 +1140,19 @@ bool renderMenuBar()
     }
 
     return didChange;
+}
+
+/// <summary>
+/// Handle keyboard shortcuts.
+/// </summary>
+/// <param name="keyboard">The keyboard state.</param>
+static void handleKeyboard(const KeyboardState& keyboard)
+{
+    if (keyboard.wasKeyPressed(VK_ESCAPE)) PostQuitMessage(0);
+
+    if (keyboard.wasKeyPressed(VK_F1)) showDemoWindow = true;
+
+    if (keyboard.wasKeyPressed(VK_SPACE)) isPlaying = !isPlaying;
 }
 
 float msToBeats(long ms, float bpm) { return ms * bpm / 60000; }
@@ -1234,13 +1234,15 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+        mouseState.newFrame();
+        keyboardState.newFrame();
+        handleKeyboard(keyboardState);
 
         if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
         if (showSettingsWindow) renderSettingsWindow();
         if (showDebugWindow) renderDebugWindow();
 
-        // Move camera by keyboard input
-        cameraController.updateCamera(timeDeltaMs);
+        cameraController.updateCamera(timeDeltaMs, keyboardState, mouseState);
 
         bool shouldRerender = isPlaying;
 

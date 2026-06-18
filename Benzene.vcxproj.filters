@@ -38,6 +38,7 @@
     <ClCompile Include="src\config.cpp" />
     <ClCompile Include="src\keyframe_marker.cpp" />
     <ClCompile Include="src\editor_music.cpp" />
+    <ClCompile Include="src\InputState.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ext.h" />
@@ -83,6 +84,7 @@
     <ClInclude Include="src\generated\release_config.h" />
     <ClInclude Include="src\nlohmann\json.hpp" />
     <ClInclude Include="src\keyframe_marker.h" />
+    <ClInclude Include="src\InputState.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ImGui">

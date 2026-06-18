@@ -49,14 +49,18 @@ UniformValue CameraKeyframeController::getRotationValue()
     return rotationValue;
 }
 
-void CameraKeyframeController::updateCamera(long timeDeltaMs)
+void CameraKeyframeController::updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse)
 {
     UniformKeyframe* positionKeyframe = positionUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
     UniformKeyframe* rotationKeyframe = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
 
-    if (isLocked && positionKeyframe == nullptr) return;
+    if (isLocked && positionKeyframe == nullptr)
+    {
+        shouldDisplayLockWarning = mouse.isDragging || keyboard.isAnyMovementKeyDown();
+        return;
+    }
 
-    cameraController.updateCamera(timeDeltaMs);
+    cameraController.updateCamera(timeDeltaMs, keyboard, mouse);
 
     if (isLocked && cameraController.didCameraMove())
     {
@@ -78,25 +82,6 @@ bool CameraKeyframeController::didCameraMove() const
 }
 
 void CameraKeyframeController::recalculateCameraTarget() { cameraController.recalculateCameraTarget(); }
-
-void CameraKeyframeController::handleKeyDown(WPARAM wParam) { cameraController.handleKeyDown(wParam); }
-void CameraKeyframeController::handleKeyUp(WPARAM wParam) { cameraController.handleKeyUp(wParam); }
-void CameraKeyframeController::handleMouseMovement(HWND hwndMain, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    bool isOnKeyframe = positionUniform.hasKeyframeAtTime(currentTime);
-
-    if (!isLocked || isOnKeyframe)
-    {
-        cameraController.handleMouseMovement(hwndMain, uMsg, wParam, lParam);
-    }
-    else
-    {
-        if (uMsg == WM_LBUTTONDOWN)
-            shouldDisplayLockWarning = true;
-        else if (uMsg == WM_LBUTTONUP)
-            shouldDisplayLockWarning = false;
-    }
-}
 
 vec3 CameraKeyframeController::getPosition() { return cameraController.position; }
 vec3 CameraKeyframeController::getTarget() { return cameraController.target; }
