@@ -3,6 +3,10 @@
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_benzene_widgets.h"
 #include "components/keyframe_marker.h"
+#include "ActionHistory.h"
+#include "actions/ChangeCameraKeyframe.h"
+#include "actions/DeleteCameraKeyframe.h"
+#include "actions/SplitCameraKeyframeToDual.h"
 
 CameraKeyframeController::CameraKeyframeController() : positionUniform("_cp", UniformType::Vec3), rotationUniform("_cr", UniformType::Vec2)
 {
@@ -49,7 +53,8 @@ UniformValue CameraKeyframeController::getRotationValue()
     return rotationValue;
 }
 
-void CameraKeyframeController::updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse)
+void CameraKeyframeController::updateCamera(
+    long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse, ActionHistory& actionHistory)
 {
     UniformKeyframe* positionKeyframe = positionUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
     UniformKeyframe* rotationKeyframe = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
@@ -60,12 +65,35 @@ void CameraKeyframeController::updateCamera(long timeDeltaMs, const KeyboardStat
         return;
     }
 
-    cameraController.updateCamera(timeDeltaMs, keyboard, mouse);
+    // didCameraMove() sometimes has forced events which we don't want to consider here
+    bool didMove = cameraController.updateCamera(timeDeltaMs, keyboard, mouse);
 
-    if (isLocked && cameraController.didCameraMove())
+    if (isLocked && didMove)
     {
+        UniformKeyframe beforePosition = *positionKeyframe;
+        std::optional<UniformKeyframe> beforeRotation = rotationKeyframe ? std::optional<UniformKeyframe>(*rotationKeyframe) : std::nullopt;
+
+        if (rotationKeyframe == nullptr)
+        {
+            rotationUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getRotationValue(), KeyframeInterpolation::Linear, 0.5f);
+            rotationKeyframe = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
+        }
+
         positionKeyframe->value = getPositionValue();
-        if (rotationKeyframe != nullptr) rotationKeyframe->value = getRotationValue();
+        rotationKeyframe->value = getRotationValue();
+
+        UniformValue afterPosition = positionKeyframe->value;
+        UniformValue afterRotation = rotationKeyframe->value;
+
+        // Lump consecutive movement frames into a single undo step by extending the most recently
+        // recorded action instead of pushing a new one, as long as it still targets this same keyframe.
+        auto* lastChange = dynamic_cast<ChangeCameraKeyframe*>(actionHistory.peekPast());
+        if (lastChange != nullptr && lastChange->targets(currentTime, isEndKeyframe))
+            lastChange->updateAfter(afterPosition, afterRotation);
+        else
+            actionHistory.record(std::make_unique<ChangeCameraKeyframe>(beforePosition, beforeRotation,
+                UniformKeyframe{currentTime, afterPosition, beforePosition.interpolation, beforePosition.interpolationFactor},
+                afterRotation, isEndKeyframe));
     }
 }
 
@@ -87,7 +115,7 @@ vec3 CameraKeyframeController::getPosition() { return cameraController.position;
 vec3 CameraKeyframeController::getTarget() { return cameraController.target; }
 vec3 CameraKeyframeController::getRotation() { return {cameraController.xAngle, cameraController.yAngle, 0}; }
 
-void CameraKeyframeController::displayKeyframeMarker()
+void CameraKeyframeController::displayKeyframeMarker(ActionHistory& actionHistory)
 {
     UniformKeyframe* kf = positionUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
 
@@ -95,36 +123,80 @@ void CameraKeyframeController::displayKeyframeMarker()
     KeyframeInterpolation interpolation = isKeyframe ? kf->interpolation : KeyframeInterpolation::Linear;
     float tension = isKeyframe ? kf->interpolationFactor : 0.5f;
     bool canSplitToDual = isKeyframe && positionUniform.countKeyframesAtTime(currentTime) < 2;
-    bool shouldSplitToDual = false;
 
-    if (KeyframeMarkerWithContextMenu("Camera", &isKeyframe, &interpolation, &tension, canSplitToDual, &shouldSplitToDual))
-    {
-        if (!isKeyframe)
-        {
-            // Keyframe was deleted
-            positionUniform.removeKeyframeAtTime(currentTime, isEndKeyframe);
-            rotationUniform.removeKeyframeAtTime(currentTime, isEndKeyframe);
-        }
-        else
-        {
-            // Keyframe was added
-            positionUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getPositionValue(), interpolation, tension);
-            rotationUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getRotationValue(), interpolation, tension);
-        }
+    auto markerResult = KeyframeMarkerWithContextMenu("Camera", isKeyframe, &interpolation, &tension, canSplitToDual);
 
-        if (shouldSplitToDual && kf != nullptr)
-        {
-            UniformValue splitPositionValue = isKeyframe ? kf->value : getPositionValue();
-            UniformKeyframe* rotationKf = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
-            UniformValue splitRotationValue = rotationKf != nullptr ? rotationKf->value : getRotationValue();
+    if (!markerResult.has_value()) return;
 
-            positionUniform.insertKeyframeAtTime(currentTime, true, splitPositionValue, interpolation, tension);
-            rotationUniform.insertKeyframeAtTime(currentTime, true, splitRotationValue, interpolation, tension);
-        }
-    }
+    std::visit(
+        [&](auto&& arg)
+        {
+            using T = std::decay_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<T, KeyframeMarkerResult::KeyframeRemoved>)
+            {
+                UniformKeyframe beforePosition = *kf;
+                UniformKeyframe* rotationKf = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
+                std::optional<UniformKeyframe> beforeRotation = rotationKf ? std::optional<UniformKeyframe>(*rotationKf) : std::nullopt;
+
+                positionUniform.removeKeyframeAtTime(currentTime, isEndKeyframe);
+                rotationUniform.removeKeyframeAtTime(currentTime, isEndKeyframe);
+
+                actionHistory.record(std::make_unique<DeleteCameraKeyframe>(currentTime, isEndKeyframe, beforePosition, beforeRotation));
+            }
+            else if constexpr (std::is_same_v<T, KeyframeMarkerResult::DragTension>)
+            {
+                // Set keyframe without recording the tension action (which will be recorded on ChangeTension)
+                positionUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getPositionValue(), interpolation, tension);
+                rotationUniform.setKeyframeAtTime(currentTime, isEndKeyframe, getRotationValue(), interpolation, tension);
+            }
+            else if constexpr (std::is_same_v<T, KeyframeMarkerResult::KeyframeAdded> ||
+                               std::is_same_v<T, KeyframeMarkerResult::ChangeInterpolation> ||
+                               std::is_same_v<T, KeyframeMarkerResult::ChangeTension>)
+            {
+                std::optional<UniformKeyframe> beforePosition = std::nullopt;
+                std::optional<UniformKeyframe> beforeRotation = std::nullopt;
+
+                if (isKeyframe)
+                {
+                    KeyframeInterpolation beforeInterpolation = interpolation;
+                    float beforeTension = tension;
+
+                    if constexpr (std::is_same_v<T, KeyframeMarkerResult::ChangeInterpolation>) beforeInterpolation = arg.from;
+                    if constexpr (std::is_same_v<T, KeyframeMarkerResult::ChangeTension>) beforeTension = arg.from;
+
+                    beforePosition = UniformKeyframe{kf->time, kf->value, beforeInterpolation, beforeTension};
+                    // Set a before keyframe for rotation even if there wasn't one before so position and rotation stay consistent
+                    beforeRotation =
+                        UniformKeyframe{currentTime, rotationUniform.valueAtTime(currentTime, isEndKeyframe), interpolation, tension};
+                }
+
+                UniformValue afterPosition = getPositionValue();
+                UniformValue afterRotation = getRotationValue();
+
+                positionUniform.setKeyframeAtTime(currentTime, isEndKeyframe, afterPosition, interpolation, tension);
+                rotationUniform.setKeyframeAtTime(currentTime, isEndKeyframe, afterRotation, interpolation, tension);
+
+                actionHistory.record(std::make_unique<ChangeCameraKeyframe>(beforePosition, beforeRotation,
+                    UniformKeyframe{currentTime, afterPosition, interpolation, tension}, afterRotation, isEndKeyframe));
+            }
+            else if constexpr (std::is_same_v<T, KeyframeMarkerResult::SplitToDual>)
+            {
+                UniformValue splitPositionValue = isKeyframe ? kf->value : getPositionValue();
+                UniformKeyframe* rotationKf = rotationUniform.getKeyframeAtTime(currentTime, isEndKeyframe);
+                UniformValue splitRotationValue = rotationKf != nullptr ? rotationKf->value : getRotationValue();
+
+                positionUniform.insertKeyframeAtTime(currentTime, true, splitPositionValue, interpolation, tension);
+                rotationUniform.insertKeyframeAtTime(currentTime, true, splitRotationValue, interpolation, tension);
+
+                actionHistory.record(std::make_unique<SplitCameraKeyframeToDual>(
+                    currentTime, splitPositionValue, std::optional<UniformValue>(splitRotationValue), interpolation, tension));
+            }
+        },
+        markerResult->value);
 }
 
-void CameraKeyframeController::displayImGuiWindow()
+void CameraKeyframeController::displayImGuiWindow(ActionHistory& actionHistory)
 {
     ImGui::SeparatorText("Camera");
     ImGui::BeginChild("Camera");
@@ -137,7 +209,7 @@ void CameraKeyframeController::displayImGuiWindow()
     }
 
     ImGui::SameLine();
-    displayKeyframeMarker();
+    displayKeyframeMarker(actionHistory);
     if ((cameraController.movementX != 0 || cameraController.movementY != 0 || cameraController.movementZ != 0 ||
             cameraController.movementToTarget != 0 || shouldDisplayLockWarning) &&
         isLocked)

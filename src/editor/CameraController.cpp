@@ -96,7 +96,7 @@ void CameraController::moveUp(float amount)
     recalculateCameraTarget();
 }
 
-void CameraController::updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse)
+bool CameraController::updateCamera(long timeDeltaMs, const KeyboardState& keyboard, const MouseState& mouse)
 {
     bool isCtrlDown = keyboard.isDown(VK_CONTROL);
     movementToTarget = keyboard.getMovementForwards() * movementScale;
@@ -131,6 +131,8 @@ void CameraController::updateCamera(long timeDeltaMs, const KeyboardState& keybo
     moveLeft(movementX * timeDelta);
     moveUp(movementY * timeDelta);
     moveForward(movementZ * timeDelta);
+
+    return mouse.isDragging || movementX != 0.0 || movementY != 0.0 || movementZ != 0.0;
 }
 
 void CameraController::resetCameraMovementCheck() { _didCameraMove = false; }
@@ -141,3 +143,4 @@ bool CameraController::didCameraMove() const
 {
     return _didCameraMove || movementX != 0 || movementY != 0 || movementZ != 0 || movementToTarget != 0;
 }
+

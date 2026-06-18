@@ -23,46 +23,84 @@ void PlotTension(KeyframeInterpolation interpolation, float tension)
 }
 } // namespace
 
-bool KeyframeMarkerWithContextMenu(
-    const char* label, bool* data, KeyframeInterpolation* interpolation, float* tension, bool showSplitToDual, bool* shouldSplitToDual)
+std::optional<KeyframeMarkerResult> KeyframeMarkerWithContextMenu(
+    const char* label, bool hasKeyframe, KeyframeInterpolation* interpolation, float* tension, bool showSplitToDual)
 {
-    bool didChange = KeyframeMarker(label, data);
+    ImGuiStorage* storage = ImGui::GetStateStorage();
+    ImGui::PushID(label);
+    const ImGuiID tensionKey = ImGui::GetID("tensionAtDragStart");
+    ImGui::PopID();
+    constexpr float NO_TENSION = -1.0f;
 
-    if (*data && ImGui::BeginPopupContextItem(label))
+    float tensionAtDragStart = storage->GetFloat(tensionKey, NO_TENSION);
+
+    bool didToggle = KeyframeMarker(label, &hasKeyframe);
+
+    if (didToggle)
     {
-        if (showSplitToDual && shouldSplitToDual != nullptr)
-        {
-            if (ImGui::Selectable("Split to Dual Keyframe", false))
-            {
-                *shouldSplitToDual = true;
-                didChange = true;
-            }
-
-            ImGui::Separator();
-        }
-
-        for (int i = 0; i < NUM_POSSIBLE_INTERPOLATIONS; i++)
-        {
-            bool isSelected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
-
-            if (ImGui::Selectable(INTERPOLATION_NAMES[i], isSelected))
-            {
-                *interpolation = POSSIBLE_INTERPOLATIONS[i];
-                didChange = true;
-            }
-
-            if (isSelected) ImGui::SetItemDefaultFocus();
-        }
-
-        if (ImGui::SliderFloat("Tension", tension, 0.0f, 1.0f, "%.2f"))
-        {
-            didChange = true;
-        }
-
-        PlotTension(*interpolation, *tension);
-
-        ImGui::EndPopup();
+        return hasKeyframe ? KeyframeMarkerResult{KeyframeMarkerResult::KeyframeAdded{}}
+                           : KeyframeMarkerResult{KeyframeMarkerResult::KeyframeRemoved{}};
     }
 
-    return didChange;
+    std::optional<KeyframeMarkerResult> result;
+
+    if (!hasKeyframe || !ImGui::BeginPopupContextItem(label))
+    {
+        storage->SetFloat(tensionKey, NO_TENSION);
+        return result;
+    }
+
+    if (showSplitToDual)
+    {
+        if (ImGui::Selectable("Split to Dual Keyframe", false))
+        {
+            result = KeyframeMarkerResult{KeyframeMarkerResult::SplitToDual{}};
+        }
+
+        ImGui::Separator();
+    }
+
+    for (int i = 0; i < NUM_POSSIBLE_INTERPOLATIONS; i++)
+    {
+        bool isSelected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
+
+        if (ImGui::Selectable(INTERPOLATION_NAMES[i], isSelected))
+        {
+            KeyframeInterpolation from = *interpolation;
+            *interpolation = POSSIBLE_INTERPOLATIONS[i];
+            if (from != *interpolation)
+            {
+                result = KeyframeMarkerResult{
+                    KeyframeMarkerResult::ChangeInterpolation{from, *interpolation}
+                };
+            }
+        }
+
+        if (isSelected) ImGui::SetItemDefaultFocus();
+    }
+
+    float previousTension = *tension;
+    if (ImGui::SliderFloat("Tension", tension, 0.0f, 1.0f, "%.2f"))
+    {
+        if (tensionAtDragStart == NO_TENSION) storage->SetFloat(tensionKey, previousTension);
+
+        result = KeyframeMarkerResult{KeyframeMarkerResult::DragTension{}};
+    }
+
+    if (ImGui::IsItemDeactivatedAfterEdit())
+    {
+        if (tensionAtDragStart != NO_TENSION)
+        {
+            result = KeyframeMarkerResult{
+                KeyframeMarkerResult::ChangeTension{tensionAtDragStart, *tension}
+            };
+            storage->SetFloat(tensionKey, NO_TENSION);
+        }
+    }
+
+    PlotTension(*interpolation, *tension);
+
+    ImGui::EndPopup();
+
+    return result;
 }
