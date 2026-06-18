@@ -5,7 +5,7 @@
 #include <string>
 #include "uniform.h"
 
-struct UniformConfig
+struct BenzeneConfig
 {
     float bpm;
     float lengthInBeats;
@@ -18,5 +18,5 @@ struct UniformConfig
     std::optional<std::string> musicWavFile;
 };
 
-bool saveConfig(const UniformConfig& config, const std::string& filename);
-UniformConfig loadConfig(const std::string& filename);
+bool saveConfig(const BenzeneConfig& config, const std::string& filename);
+BenzeneConfig loadConfig(const std::string& filename);

@@ -123,9 +123,9 @@ static json uniformValueToJson(const UniformType type, const UniformValue value)
     return nullptr;
 }
 
-UniformConfig loadConfig(const std::string& filename)
+BenzeneConfig loadConfig(const std::string& filename)
 {
-    UniformConfig config;
+    BenzeneConfig config;
 
     std::ifstream configFile(filename);
 
@@ -215,7 +215,7 @@ json uniformToJson(const Uniform& uniform)
     return uniformJson;
 }
 
-bool saveConfig(const UniformConfig& config, const std::string& filename)
+bool saveConfig(const BenzeneConfig& config, const std::string& filename)
 {
     std::ofstream file(filename);
     if (!file.is_open())

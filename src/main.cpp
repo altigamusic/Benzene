@@ -765,7 +765,7 @@ void loadConfigFromFile(const std::string& filename)
 {
     try
     {
-        UniformConfig cfg = loadConfig(filename);
+        BenzeneConfig cfg = loadConfig(filename);
         uniformList = std::move(cfg.uniformList);
         bpm = cfg.bpm;
         releaseResolutionX = cfg.resolutionX;
@@ -802,7 +802,7 @@ void saveConfigToFile(const std::string& filename)
         std::optional<std::string> musicPath =
             (loadedMusicPath != nullptr && loadedMusicPath[0] != '\0') ? std::optional<std::string>(loadedMusicPath) : std::nullopt;
 
-        UniformConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, shaderQuantizationDigits,
+        BenzeneConfig config{(float)bpm, (float)demoTimeLength, releaseResolutionX, releaseResolutionY, shaderQuantizationDigits,
             uniformList, cameraController.positionUniform, cameraController.rotationUniform, musicPath};
         saveConfig(config, filename);
     }
