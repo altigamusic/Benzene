@@ -84,6 +84,7 @@ def parse_config_file(filename):
     uniforms = [
         Uniform(uniform["name"], uniform["type"], [parse_keyframe(kf) for kf in uniform["keyframes"]], uniform.get("quantization"))
         for uniform in config["uniforms"]
+        if len(uniform["keyframes"]) > 0  # Empty uniforms get discarded
     ]
 
     # Guarantee keyframe at 0
