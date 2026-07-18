@@ -64,7 +64,7 @@ std::optional<KeyframeMarkerResult> KeyframeMarkerWithContextMenu(
     {
         bool isSelected = (*interpolation == POSSIBLE_INTERPOLATIONS[i]);
 
-        if (ImGui::Selectable(INTERPOLATION_NAMES[i], isSelected))
+        if (ImGui::Selectable(INTERPOLATION_NAMES[i], isSelected, ImGuiSelectableFlags_NoAutoClosePopups))
         {
             KeyframeInterpolation from = *interpolation;
             *interpolation = POSSIBLE_INTERPOLATIONS[i];
