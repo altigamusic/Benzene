@@ -529,7 +529,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         ImGui::SetNextWindowPos(ImVec2(0, windowRenderer.viewportHeight), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(windowRenderer.timelineWidth, windowRenderer.timelineHeight), ImGuiCond_Always);
 
-        ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+        ImGui::Begin("Timeline", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
         shouldRerender |= renderToolbar(timeInBeats, info);
 
@@ -552,7 +552,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
         ImGui::Begin("Editor", nullptr,
             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar |
-                ImGuiWindowFlags_NoTitleBar);
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
         if (renderMenuBar()) shouldRerender = true;
 
