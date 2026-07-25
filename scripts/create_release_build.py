@@ -105,7 +105,7 @@ def parse_config_file(filename):
 
 def keyframe_to_array_string(keyframe: Keyframe, idx: int, include_tension: bool):
     tension = f", {keyframe.tension}" if include_tension else ""
-    return f"{{{keyframe.time}, {keyframe.values[idx]:.6f}f, {keyframe.interpolation}{tension}}}"
+    return f"{{{keyframe.time}, {keyframe.values[idx]}f, {keyframe.interpolation}{tension}}}"
 
 
 def number_of_params(uniform: Uniform):
