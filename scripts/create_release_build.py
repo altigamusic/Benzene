@@ -60,11 +60,12 @@ UNIFORM_TYPE_TO_OPENGL_TYPE = {
 
 
 def get_corrected_tension(tension, interpolation):
-    # Copied from convert01ToCorrectFactor function in uniform.cpp
+    # Copied from convert01ToCorrectFactor function in uniform.cpp, except we quantize the
+    # tension because it's unnoticeable and saves bytes
     if interpolation == InterpolationType.TONEMAP:
-        return (tension - 0.5) * 20
+        return quantize_float_bytes((tension - 0.5) * 20, 0)
     elif interpolation == InterpolationType.GAIN:
-        return tension * 19 + 1
+        return quantize_float_bytes(tension * 19 + 1, 0)
     else:
         # No factor needed for linear or step
         return 0
