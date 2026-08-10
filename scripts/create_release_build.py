@@ -122,6 +122,15 @@ def number_of_params(uniform: Uniform):
         raise ValueError(f"Unsupported uniform type: {uniform.type}")
 
 
+def keyframe_name(uniform: Uniform, idx: int):
+    if uniform.type == "float":
+        return uniform.name
+
+    coord = "rgb"[idx] if uniform.type == "color" else "xyzw"[idx]
+
+    return f"{uniform.name}.{coord}"
+
+
 def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     arrays = []
     index = 0
@@ -131,7 +140,7 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
             kf_array = ", ".join(keyframe_to_array_string(kf, i, include_tension) for kf in uniform.keyframes)
 
             if len(kf_array) > 0:
-                arrays.append(f"Keyframe keyframes{index}[] = {{{kf_array}}};")
+                arrays.append(f"Keyframe keyframes{index}[] = {{{kf_array}}}; // {keyframe_name(uniform, i)}")
 
             index += 1
 
