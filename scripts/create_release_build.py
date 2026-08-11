@@ -95,12 +95,6 @@ def parse_config_file(filename):
 
     return uniforms, config
 
-
-def keyframe_to_array_string(keyframe: Keyframe, idx: int, include_tension: bool):
-    tension = f", {keyframe.tension}" if include_tension else ""
-    return f"{{{keyframe.time}, {keyframe.values[idx]}f, {keyframe.interpolation}{tension}}}"
-
-
 def number_of_params(uniform: Uniform):
     if uniform.type == "float":
         return 1
@@ -124,20 +118,38 @@ def keyframe_name(uniform: Uniform, idx: int):
 
 
 def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
-    arrays = []
+    time_rows = []
+    value_rows = []
+    interpolation_rows = []
+    tension_rows = []
+    offsets = []
     index = 0
 
     for uniform in uniforms:
         param_count = number_of_params(uniform)
         for i in range(param_count):
-            kf_array = ", ".join(keyframe_to_array_string(kf, i, include_tension) for kf in uniform.keyframes)
+            keyframes = uniform.keyframes
 
-            if len(kf_array) > 0:
-                arrays.append(f"Keyframe keyframes{index}[] = {{{kf_array}}}; // {keyframe_name(uniform, i)}")
+            if len(keyframes) > 0:
+                comment = f" // {keyframe_name(uniform, i)}"
+                time_rows.append(f"    {', '.join(str(kf.time) for kf in keyframes)},{comment}")
+                value_rows.append(f"    {', '.join(f'{kf.values[i]}f' for kf in keyframes)},{comment}")
+                interpolation_rows.append(f"    {', '.join(str(kf.interpolation) for kf in keyframes)},{comment}")
+                if include_tension:
+                    tension_rows.append(f"    {', '.join(str(kf.tension) for kf in keyframes)},{comment}")
 
-            index += 1
+                offsets.append(index)
+                index += len(keyframes)
+            else:
+                offsets.append(0)
 
-    return "\n".join(arrays)
+    declaration = "int keyframeTimes[] = {\n" + "\n".join(time_rows) + "\n};\n"
+    declaration += "float keyframeValues[] = {\n" + "\n".join(value_rows) + "\n};\n"
+    declaration += "unsigned char keyframeInterpolations[] = {\n" + "\n".join(interpolation_rows) + "\n};"
+    if include_tension:
+        declaration += "\nfloat keyframeTensions[] = {\n" + "\n".join(tension_rows) + "\n};"
+
+    return declaration, offsets
 
 
 def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension: bool, is_time_byte: bool):
@@ -209,7 +221,10 @@ ByteKeyframe byteKeyframes[] = {{
 }};
 
 unsigned char divisionFactors[{number_of_values}] = {{{", ".join(f"{factor}" for factor in factors)}}};
-Keyframe tempArray[{number_of_keyframes}] = {{}};
+int tempTimes[{number_of_keyframes}] = {{}};
+float tempValues[{number_of_keyframes}] = {{}};
+unsigned char tempInterpolations[{number_of_keyframes}] = {{}};
+{"" if include_tension else "//"}float tempTensions[{number_of_keyframes}] = {{}};
 """
 
 
@@ -220,22 +235,20 @@ def generate_byte_keyframe_updates(uniforms: list[Uniform] | None, offset: int, 
     number_of_values = sum(number_of_params(uniform) for uniform in uniforms)
     number_of_keyframes = len(uniforms[0].keyframes)
 
-    if include_tension:
-        declaration = "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / ((float)divisionFactors[k]), byteKeyframes[i].interpolation, byteKeyframes[i].tension}"
-    else:
-        declaration = (
-            "{byteKeyframes[i].time, ((float)byteKeyframes[i].values[k]) / ((float)divisionFactors[k]), byteKeyframes[i].interpolation}"
-        )
+    tension_assignment = "\n            tempTensions[i] = byteKeyframes[i].tension;" if include_tension else ""
+    tension_arg = "tempTensions, " if include_tension else ""
 
     return f"""
     for (int k = 0; k < {number_of_values}; k++)
     {{
         for (int i = 0; i < {number_of_keyframes}; i++)
         {{
-            tempArray[i] = {declaration};
+            tempTimes[i] = byteKeyframes[i].time;
+            tempValues[i] = ((float)byteKeyframes[i].values[k]) / ((float)divisionFactors[k]);
+            tempInterpolations[i] = byteKeyframes[i].interpolation;{tension_assignment}
         }}
 
-        values[k + {offset}] = valueAtTimeAsm(time, tempArray, {number_of_keyframes});
+        values[k + {offset}] = valueAtTime(time, tempTimes, tempValues, tempInterpolations, {tension_arg}0, {number_of_keyframes});
     }}
 """
 
@@ -344,12 +357,13 @@ def generate_release_file_code(uniforms: list[Uniform], length: int, include_ten
         camera_uniforms = [uniform for uniform in uniforms if uniform.name in ("_cp", "_cr")]
         uniforms = [uniform for uniform in uniforms if uniform.name not in ("_cp", "_cr")]
 
-    # Generate all keyframe array declarations
-    keyframe_arrays = gen_keyframe_arrays(uniforms, include_tension)
+    # Generate a single combined keyframe array declaration
+    keyframe_arrays, keyframe_offsets = gen_keyframe_arrays(uniforms, include_tension)
 
     kf_index = 0
     value_index = 1
     value_assignments = ["    values[0] = time;"]
+    tension_arg = "keyframeTensions, " if include_tension else ""
 
     for uniform in uniforms:
         number_of_keyframes = len(uniform.keyframes)
@@ -359,7 +373,11 @@ def generate_release_file_code(uniforms: list[Uniform], length: int, include_ten
             if number_of_keyframes == 0:
                 value = "0.0f"
             else:
-                value = f"valueAtTimeAsm(time, keyframes{kf_index + j}, {number_of_keyframes})"
+                offset = keyframe_offsets[kf_index + j]
+                value = (
+                    f"valueAtTime(time, keyframeTimes, keyframeValues, keyframeInterpolations, "
+                    f"{tension_arg}{offset}, {number_of_keyframes})"
+                )
             value_assignments.append(f"    values[{value_index}] = {value};")
             value_index += 1
 

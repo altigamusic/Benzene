@@ -16,23 +16,34 @@ struct Keyframe
 #endif
 };
 
-inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
+inline float valueAtTime(float time, int* times, float* values, unsigned char* interpolations,
+#ifndef DEFAULT_INTERPOLATION_FACTOR
+    float* tensions,
+#endif
+    int offset, int keyframeCount)
 {
+    times += offset;
+    values += offset;
+    interpolations += offset;
+#ifndef DEFAULT_INTERPOLATION_FACTOR
+    tensions += offset;
+#endif
+
     int i = 0;
-    while (keyframes[i].time <= time && i < keyframeCount)
+    while (times[i] <= time && i < keyframeCount)
         i++;
 
-    if (i == keyframeCount) return keyframes[keyframeCount - 1].value;
+    if (i == keyframeCount) return values[keyframeCount - 1];
 
     // This assumes a keyframe at 0
-    float t = ((time - keyframes[i - 1].time) / (keyframes[i].time - keyframes[i - 1].time));
+    float t = ((time - times[i - 1]) / (times[i] - times[i - 1]));
 #ifdef DEFAULT_INTERPOLATION_FACTOR
     float a = DEFAULT_INTERPOLATION_FACTOR;
 #else
-    float a = keyframes[i].interpolationFactor;
+    float a = tensions[i];
 #endif
 
-    switch (keyframes[i].interpolation)
+    switch (interpolations[i])
     {
     case 1: // Step
         t = 0;
@@ -52,19 +63,22 @@ inline float valueAtTime(float time, Keyframe* keyframes, int keyframeCount)
         break;
     }
 
-    return keyframes[i - 1].value + (keyframes[i].value - keyframes[i - 1].value) * t;
+    return values[i - 1] + (values[i] - values[i - 1]) * t;
 }
 
-static const float valueAtTimeAsmExponent = DEFAULT_INTERPOLATION_FACTOR;
+static const float valueAtTimeAsmExponent = 0.;
 static const float valueAtTimeAsmHalf = 0.5f;
 
-__declspec(naked) inline float valueAtTimeAsm(float time, Keyframe* keyframes, int keyframeCount)
+__declspec(naked) inline float valueAtTimeAsm(float time, Keyframe* keyframes, int offset, int keyframeCount)
 {
     __asm
     {
         push ebx
         mov ebx, DWORD PTR [esp + 12]
-        mov ecx, DWORD PTR [esp + 16]
+        mov eax, DWORD PTR [esp + 16]
+        lea eax, [eax + eax * 8]
+        add ebx, eax
+        mov ecx, DWORD PTR [esp + 20]
         fld DWORD PTR [esp + 8]
 
 scanLoop:
