@@ -125,8 +125,6 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     value_rows = []
     interpolation_rows = []
     tension_rows = []
-    offsets = []
-    index = 0
 
     for uniform in uniforms:
         param_count = number_of_params(uniform)
@@ -141,18 +139,13 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
                 if include_tension:
                     tension_rows.append(f"    {', '.join(str(kf.tension) for kf in keyframes)},{comment}")
 
-                offsets.append(index)
-                index += len(keyframes)
-            else:
-                offsets.append(0)
-
     declaration = "kf_time_t keyframeTimes[] = {\n" + "\n".join(time_rows) + "\n};\n"
     declaration += "float keyframeValues[] = {\n" + "\n".join(value_rows) + "\n};\n"
     declaration += "unsigned char keyframeInterpolations[] = {\n" + "\n".join(interpolation_rows) + "\n};"
     if include_tension:
         declaration += "\nchar keyframeTensions[] = {\n" + "\n".join(tension_rows) + "\n};"
 
-    return declaration, offsets
+    return declaration
 
 
 def generate_byte_keyframe_array(uniforms: list[Uniform] | None, include_tension: bool, is_time_byte: bool):
@@ -361,36 +354,32 @@ def generate_release_file_code(uniforms: list[Uniform], length: int, include_ten
         uniforms = [uniform for uniform in uniforms if uniform.name not in ("_cp", "_cr")]
 
     # Generate a single combined keyframe array declaration
-    keyframe_arrays, keyframe_offsets = gen_keyframe_arrays(uniforms, include_tension)
+    keyframe_arrays = gen_keyframe_arrays(uniforms, include_tension)
 
-    kf_index = 0
-    value_index = 1
-    value_assignments = ["    values[0] = time;"]
     tension_arg = "keyframeTensions, " if include_tension else ""
 
-    for uniform in uniforms:
-        number_of_keyframes = len(uniform.keyframes)
-        param_count = number_of_params(uniform)
-
-        for j in range(param_count):
-            if number_of_keyframes == 0:
-                value = "0.0f"
-            else:
-                offset = keyframe_offsets[kf_index + j]
-                value = (
-                    f"valueAtTime(time, keyframeTimes, keyframeValues, keyframeInterpolations, "
-                    f"{tension_arg}{offset}, {number_of_keyframes})"
-                )
-            value_assignments.append(f"    values[{value_index}] = {value};")
-            value_index += 1
-
-        kf_index += param_count
+    keyframe_counts = [len(uniform.keyframes) for uniform in uniforms for _ in range(number_of_params(uniform))]
+    value_index = 1 + len(keyframe_counts)
 
     camera_uniform_value_count = (
         sum(number_of_params(camera_uniform) for camera_uniform in camera_uniforms) if camera_uniforms is not None else 0
     )
     uniform_value_count = value_index + camera_uniform_value_count
-    uniform_updates = "\n".join(value_assignments)
+
+    if any(count > 255 for count in keyframe_counts):
+        # If any uniform has more than 255 keyframes, the count can't be saved as a byte.
+        # The fix is easy - save as shorts - but I don't believe this will actually
+        # happen so I didn't add code to handle it
+        raise ValueError("A uniform has more than 255 keyframes - optimization not possible")
+
+    uniform_updates = f"""    values[0] = time;
+    unsigned char keyframeCounts[] = {{{", ".join(str(count) for count in keyframe_counts)}}};
+    int offset = 0;
+    for (int i = 0; i < {len(keyframe_counts)}; i++)
+    {{
+        values[i + 1] = valueAtTime(time, keyframeTimes, keyframeValues, keyframeInterpolations, {tension_arg}offset, keyframeCounts[i]);
+        offset += keyframeCounts[i];
+    }}"""
 
     byte_keyframes = generate_byte_keyframe_array(camera_uniforms, include_tension, length <= 255)
     byte_keyframe_updates = generate_byte_keyframe_updates(camera_uniforms, value_index, include_tension)
