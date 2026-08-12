@@ -18,7 +18,7 @@ struct Keyframe
 
 inline float valueAtTime(float time, int* times, float* values, unsigned char* interpolations,
 #ifndef DEFAULT_INTERPOLATION_FACTOR
-    float* tensions,
+    char* tensions,
 #endif
     int offset, int keyframeCount)
 {
@@ -40,7 +40,7 @@ inline float valueAtTime(float time, int* times, float* values, unsigned char* i
 #ifdef DEFAULT_INTERPOLATION_FACTOR
     float a = DEFAULT_INTERPOLATION_FACTOR;
 #else
-    float a = tensions[i];
+    float a = ((float)tensions[i]) / 6.0f;
 #endif
 
     switch (interpolations[i])
