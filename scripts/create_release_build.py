@@ -146,7 +146,7 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
             else:
                 offsets.append(0)
 
-    declaration = "int keyframeTimes[] = {\n" + "\n".join(time_rows) + "\n};\n"
+    declaration = "kf_time_t keyframeTimes[] = {\n" + "\n".join(time_rows) + "\n};\n"
     declaration += "float keyframeValues[] = {\n" + "\n".join(value_rows) + "\n};\n"
     declaration += "unsigned char keyframeInterpolations[] = {\n" + "\n".join(interpolation_rows) + "\n};"
     if include_tension:
@@ -444,6 +444,8 @@ def generate_release_header(
 #define YRES {resolution[1]}
 {default_interpolation}
 {interpolation_includes}
+
+typedef {"unsigned char" if length <= 255 else "int"} kf_time_t;
 """)
 
 

@@ -16,7 +16,7 @@ struct Keyframe
 #endif
 };
 
-inline float valueAtTime(float time, int* times, float* values, unsigned char* interpolations,
+inline float valueAtTime(float time, kf_time_t* times, float* values, unsigned char* interpolations,
 #ifndef DEFAULT_INTERPOLATION_FACTOR
     char* tensions,
 #endif
