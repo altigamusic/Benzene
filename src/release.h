@@ -16,11 +16,11 @@ struct Keyframe
 #endif
 };
 
-inline float valueAtTime(float time, kf_time_t* times, float* values, unsigned char* interpolations,
+inline float valueAtTime(float time, kf_time_t* times, char* values, unsigned char* interpolations,
 #ifndef DEFAULT_INTERPOLATION_FACTOR
     char* tensions,
 #endif
-    int offset, int keyframeCount)
+    int offset, int keyframeCount, float scale)
 {
     times += offset;
     values += offset;
@@ -33,7 +33,7 @@ inline float valueAtTime(float time, kf_time_t* times, float* values, unsigned c
     while (times[i] <= time && i < keyframeCount)
         i++;
 
-    if (i == keyframeCount) return values[keyframeCount - 1];
+    if (i == keyframeCount) return values[keyframeCount - 1] / scale;
 
     // This assumes a keyframe at 0
     float t = ((time - times[i - 1]) / (times[i] - times[i - 1]));
@@ -63,7 +63,7 @@ inline float valueAtTime(float time, kf_time_t* times, float* values, unsigned c
         break;
     }
 
-    return values[i - 1] + (values[i] - values[i - 1]) * t;
+    return (values[i - 1] + (values[i] - values[i - 1]) * t) / scale;
 }
 
 static const float valueAtTimeAsmExponent = 0.;
