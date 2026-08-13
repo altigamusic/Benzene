@@ -53,12 +53,12 @@ UNIFORM_TYPE_TO_OPENGL_TYPE = {
 def get_corrected_tension(tension, interpolation):
     # Copied from convert01ToCorrectFactor function in uniform.cpp, except we convert them to bytes
     # because it's unnoticeable.
-    # These values are scaled 6x to have more range in the byte, the valueAtTime function
-    # divides them by 6 appropriately.
+    # These values are scaled 1.6x to have more range in the byte, the valueAtTime function
+    # divides them by 1.6 appropriately.
     if interpolation == InterpolationType.TONEMAP:
-        return int((tension - 0.5) * 20)
+        return int((tension - 0.5) * 32)
     elif interpolation == InterpolationType.GAIN:
-        return int(tension * 19 + 1)
+        return int((tension * 19 + 1) * 32 / 20)
     else:
         # No factor needed for linear or step
         return 0
