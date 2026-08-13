@@ -16,11 +16,13 @@ struct Keyframe
 #endif
 };
 
-inline float valueAtTime(float time, kf_time_t* times, char* values, unsigned char* interpolations,
-#ifndef DEFAULT_INTERPOLATION_FACTOR
-    char* tensions,
-#endif
-    int keyframeCount, float scale)
+struct Interpolation
+{
+    unsigned char interpolation : 2;
+    char tension : 6;
+};
+
+inline float valueAtTime(float time, kf_time_t* times, char* values, Interpolation* interpolations, int keyframeCount, float scale)
 {
     int i = 0;
     while (times[i] <= time && i < keyframeCount)
@@ -33,10 +35,10 @@ inline float valueAtTime(float time, kf_time_t* times, char* values, unsigned ch
 #ifdef DEFAULT_INTERPOLATION_FACTOR
     float a = DEFAULT_INTERPOLATION_FACTOR;
 #else
-    float a = ((float)tensions[i]) / 6.0f;
+    float a = ((float)interpolations[i].tension);
 #endif
 
-    switch (interpolations[i])
+    switch (interpolations[i].interpolation)
     {
     case 1: // Step
         t = 0;

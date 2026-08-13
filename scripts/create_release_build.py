@@ -56,9 +56,9 @@ def get_corrected_tension(tension, interpolation):
     # These values are scaled 6x to have more range in the byte, the valueAtTime function
     # divides them by 6 appropriately.
     if interpolation == InterpolationType.TONEMAP:
-        return int((tension - 0.5) * 120)
+        return int((tension - 0.5) * 20)
     elif interpolation == InterpolationType.GAIN:
-        return int((tension * 19 + 1) * 6)
+        return int(tension * 19 + 1)
     else:
         # No factor needed for linear or step
         return 0
@@ -136,7 +136,6 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     time_rows = []
     value_rows = []
     interpolation_rows = []
-    tension_rows = []
     scales = []
 
     for uniform in uniforms:
@@ -152,16 +151,12 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
 
                 time_rows.append(f"    {', '.join(str(kf.time) for kf in keyframes)},{comment}")
                 value_rows.append(f"    {', '.join(str(value_to_scaled_byte(v, scale)) for v in raw_values)},{comment}")
-                interpolation_rows.append(f"    {', '.join(str(kf.interpolation) for kf in keyframes)},{comment}")
-                if include_tension:
-                    tension_rows.append(f"    {', '.join(str(kf.tension) for kf in keyframes)},{comment}")
+                interpolation_rows.append(f"    {', '.join(f'{{{kf.interpolation}, {kf.tension}}}' for kf in keyframes)},{comment}")
 
     declaration = "kf_time_t keyframeTimes[] = {\n" + "\n".join(time_rows) + "\n};\n"
     declaration += "char keyframeValues[] = {\n" + "\n".join(value_rows) + "\n};\n"
     declaration += "float keyframeScales[] = {" + ", ".join(f"{s}f" for s in scales) + "};\n"
-    declaration += "unsigned char keyframeInterpolations[] = {\n" + "\n".join(interpolation_rows) + "\n};"
-    if include_tension:
-        declaration += "\nchar keyframeTensions[] = {\n" + "\n".join(tension_rows) + "\n};"
+    declaration += "Interpolation keyframeInterpolations[] = {\n" + "\n".join(interpolation_rows) + "\n};"
 
     return declaration
 
@@ -272,7 +267,7 @@ def generate_release_file_code(uniforms: list[Uniform], include_tension: bool):
     int offset = 0;
     for (int i = 0; i < {len(keyframe_counts)}; i++)
     {{
-        values[i + 1] = valueAtTime(time, keyframeTimes + offset, keyframeValues + offset, keyframeInterpolations + offset, {tension_arg}keyframeCounts[i], keyframeScales[i]);
+        values[i + 1] = valueAtTime(time, keyframeTimes + offset, keyframeValues + offset, keyframeInterpolations + offset, keyframeCounts[i], keyframeScales[i]);
         offset += keyframeCounts[i];
     }}"""
 
