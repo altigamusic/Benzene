@@ -1,9 +1,9 @@
+import json
 import os
+import struct
 import subprocess
 from dataclasses import dataclass
 from enum import IntEnum
-import json
-import struct
 
 
 class InterpolationType(IntEnum):
@@ -119,11 +119,25 @@ def keyframe_name(uniform: Uniform, idx: int):
     return f"{uniform.name}.{coord}"
 
 
+def compute_keyframe_scale(values: list[float]) -> float:
+    """
+    A single scale factor, such that multiplying `values` by it and rounding maps them into
+    the signed byte range [-128, 127]. The original values are recovered by dividing by it.
+    """
+    max_abs = max(abs(v) for v in values)
+    return quantize_float_bytes(127.0 / max_abs if max_abs > 0 else 1.0, 0)
+
+
+def value_to_scaled_byte(value: float, scale: float) -> int:
+    return max(-128, min(127, round(value * scale)))
+
+
 def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
     time_rows = []
     value_rows = []
     interpolation_rows = []
     tension_rows = []
+    scales = []
 
     for uniform in uniforms:
         param_count = number_of_params(uniform)
@@ -132,14 +146,19 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
 
             if len(keyframes) > 0:
                 comment = f" // {keyframe_name(uniform, i)}"
+                raw_values = [kf.values[i] for kf in keyframes]
+                scale = compute_keyframe_scale(raw_values)
+                scales.append(scale)
+
                 time_rows.append(f"    {', '.join(str(kf.time) for kf in keyframes)},{comment}")
-                value_rows.append(f"    {', '.join(f'{kf.values[i]}f' for kf in keyframes)},{comment}")
+                value_rows.append(f"    {', '.join(str(value_to_scaled_byte(v, scale)) for v in raw_values)},{comment}")
                 interpolation_rows.append(f"    {', '.join(str(kf.interpolation) for kf in keyframes)},{comment}")
                 if include_tension:
                     tension_rows.append(f"    {', '.join(str(kf.tension) for kf in keyframes)},{comment}")
 
     declaration = "kf_time_t keyframeTimes[] = {\n" + "\n".join(time_rows) + "\n};\n"
-    declaration += "float keyframeValues[] = {\n" + "\n".join(value_rows) + "\n};\n"
+    declaration += "char keyframeValues[] = {\n" + "\n".join(value_rows) + "\n};\n"
+    declaration += "float keyframeScales[] = {" + ", ".join(f"{s}f" for s in scales) + "};\n"
     declaration += "unsigned char keyframeInterpolations[] = {\n" + "\n".join(interpolation_rows) + "\n};"
     if include_tension:
         declaration += "\nchar keyframeTensions[] = {\n" + "\n".join(tension_rows) + "\n};"
@@ -224,20 +243,8 @@ def uniform_to_const(uniform: Uniform, quantization_default_digits: int):
     return Const(uniform.name, uniform.type, keyframe_values_to_const_value(uniform.type, keyframe_values, digits))
 
 
-def quantize_keyframe(keyframe: Keyframe, quantization_bytes: int):
-    quantized_values = [quantize_float_bytes(v, quantization_bytes) for v in keyframe.values]
-    return Keyframe(keyframe.time, quantized_values, keyframe.interpolation, keyframe.tension)
-
-
-def quantize_uniform(uniform: Uniform, quantization_default_digits: int):
-    quantization_bytes = uniform.quantization if uniform.quantization is not None else quantization_default_digits
-    quantized_keyframes = [quantize_keyframe(kf, quantization_bytes) for kf in uniform.keyframes]
-
-    return Uniform(uniform.name, uniform.type, quantized_keyframes, uniform.quantization)
-
-
 def split_animated_and_const_uniforms(uniforms: list[Uniform], quantization_default_digits: int):
-    animated_uniforms = [quantize_uniform(uniform, quantization_default_digits) for uniform in uniforms if len(uniform.keyframes) > 1]
+    animated_uniforms = [uniform for uniform in uniforms if len(uniform.keyframes) > 1]
     consts = [uniform_to_const(uniform, quantization_default_digits) for uniform in uniforms if len(uniform.keyframes) <= 1]
 
     return animated_uniforms, consts
@@ -265,7 +272,7 @@ def generate_release_file_code(uniforms: list[Uniform], include_tension: bool):
     int offset = 0;
     for (int i = 0; i < {len(keyframe_counts)}; i++)
     {{
-        values[i + 1] = valueAtTime(time, keyframeTimes, keyframeValues, keyframeInterpolations, {tension_arg}offset, keyframeCounts[i]);
+        values[i + 1] = valueAtTime(time, keyframeTimes, keyframeValues, keyframeInterpolations, {tension_arg}offset, keyframeCounts[i], keyframeScales[i]);
         offset += keyframeCounts[i];
     }}"""
 
