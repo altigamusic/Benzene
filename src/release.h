@@ -20,15 +20,8 @@ inline float valueAtTime(float time, kf_time_t* times, char* values, unsigned ch
 #ifndef DEFAULT_INTERPOLATION_FACTOR
     char* tensions,
 #endif
-    int offset, int keyframeCount, float scale)
+    int keyframeCount, float scale)
 {
-    times += offset;
-    values += offset;
-    interpolations += offset;
-#ifndef DEFAULT_INTERPOLATION_FACTOR
-    tensions += offset;
-#endif
-
     int i = 0;
     while (times[i] <= time && i < keyframeCount)
         i++;

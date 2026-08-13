@@ -254,7 +254,7 @@ def generate_release_file_code(uniforms: list[Uniform], include_tension: bool):
     # Generate a single combined keyframe array declaration
     keyframe_arrays = gen_keyframe_arrays(uniforms, include_tension)
 
-    tension_arg = "keyframeTensions, " if include_tension else ""
+    tension_arg = "keyframeTensions + offset, " if include_tension else ""
 
     keyframe_counts = [len(uniform.keyframes) for uniform in uniforms for _ in range(number_of_params(uniform))]
     value_index = 1 + len(keyframe_counts)
@@ -272,7 +272,7 @@ def generate_release_file_code(uniforms: list[Uniform], include_tension: bool):
     int offset = 0;
     for (int i = 0; i < {len(keyframe_counts)}; i++)
     {{
-        values[i + 1] = valueAtTime(time, keyframeTimes, keyframeValues, keyframeInterpolations, {tension_arg}offset, keyframeCounts[i], keyframeScales[i]);
+        values[i + 1] = valueAtTime(time, keyframeTimes + offset, keyframeValues + offset, keyframeInterpolations + offset, {tension_arg}keyframeCounts[i], keyframeScales[i]);
         offset += keyframeCounts[i];
     }}"""
 
