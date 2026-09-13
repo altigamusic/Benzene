@@ -34,7 +34,7 @@ inline float valueAtTime(float time, kf_time_t* times, char* values, Interpolati
         i++;
     }
 
-    if (i == keyframeCount - 1) return values[keyframeCount - 1] / scale;
+    if (i == keyframeCount - 1) return values[i] / scale;
 
     float t = time / times[i];
 #ifdef DEFAULT_INTERPOLATION_FACTOR
