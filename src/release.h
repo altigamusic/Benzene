@@ -25,20 +25,25 @@ struct Interpolation
 inline float valueAtTime(float time, kf_time_t* times, char* values, Interpolation* interpolations, int keyframeCount, float scale)
 {
     int i = 0;
-    while (times[i] <= time && i < keyframeCount)
+
+    // Subtract each delta from the time variable, so it ends up being how far in
+    // we are in the current keyframe
+    while (i < keyframeCount - 1 && times[i] <= time)
+    {
+        time -= times[i];
         i++;
+    }
 
-    if (i == keyframeCount) return values[keyframeCount - 1] / scale;
+    if (i == keyframeCount - 1) return values[keyframeCount - 1] / scale;
 
-    // This assumes a keyframe at 0
-    float t = ((time - times[i - 1]) / (times[i] - times[i - 1]));
+    float t = time / times[i];
 #ifdef DEFAULT_INTERPOLATION_FACTOR
     float a = DEFAULT_INTERPOLATION_FACTOR;
 #else
-    float a = ((float)interpolations[i].tension);
+    float a = ((float)interpolations[i + 1].tension);
 #endif
 
-    switch (interpolations[i].interpolation)
+    switch (interpolations[i + 1].interpolation)
     {
     case 1: // Step
         t = 0;
@@ -58,7 +63,7 @@ inline float valueAtTime(float time, kf_time_t* times, char* values, Interpolati
         break;
     }
 
-    return (values[i - 1] + (values[i] - values[i - 1]) * t) / scale;
+    return (values[i] + (values[i + 1] - values[i]) * t) / scale;
 }
 
 static const float valueAtTimeAsmExponent = 0.;

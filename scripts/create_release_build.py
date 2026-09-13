@@ -149,7 +149,11 @@ def gen_keyframe_arrays(uniforms: list[Uniform], include_tension: bool):
                 scale = compute_keyframe_scale(raw_values)
                 scales.append(scale)
 
-                time_rows.append(f"    {', '.join(str(kf.time) for kf in keyframes)},{comment}")
+                # Store times as deltas
+                times = [kf.time for kf in keyframes]
+                delta_times = [times[j] - times[j - 1] for j in range(1, len(times))]
+
+                time_rows.append(f"    {', '.join(str(dt) for dt in delta_times)},{comment}")
                 value_rows.append(f"    {', '.join(str(value_to_scaled_byte(v, scale)) for v in raw_values)},{comment}")
                 interpolation_rows.append(f"    {', '.join(f'{{{kf.interpolation}, {kf.tension}}}' for kf in keyframes)},{comment}")
 
@@ -267,7 +271,7 @@ def generate_release_file_code(uniforms: list[Uniform], include_tension: bool):
     int offset = 0;
     for (int i = 0; i < {len(keyframe_counts)}; i++)
     {{
-        values[i + 1] = valueAtTime(time, keyframeTimes + offset, keyframeValues + offset, keyframeInterpolations + offset, keyframeCounts[i], keyframeScales[i]);
+        values[i + 1] = valueAtTime(time, keyframeTimes + offset - i, keyframeValues + offset, keyframeInterpolations + offset, keyframeCounts[i], keyframeScales[i]);
         offset += keyframeCounts[i];
     }}"""
 
