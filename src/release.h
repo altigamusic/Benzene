@@ -40,10 +40,10 @@ inline float valueAtTime(float time, kf_time_t* times, char* values, Interpolati
 #ifdef DEFAULT_INTERPOLATION_FACTOR
     float a = DEFAULT_INTERPOLATION_FACTOR;
 #else
-    float a = ((float)interpolations[i + 1].tension);
+    float a = ((float)interpolations[i].tension);
 #endif
 
-    switch (interpolations[i + 1].interpolation)
+    switch (interpolations[i].interpolation)
     {
     case 1: // Step
         t = 0;
