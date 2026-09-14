@@ -11,10 +11,10 @@ extern WindowRenderer windowRenderer;
 #define VIEWPORT_WIDTH windowRenderer.viewportWidth
 #define VIEWPORT_HEIGHT windowRenderer.viewportHeight
 #else
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
-#define VIEWPORT_WIDTH 800
-#define VIEWPORT_HEIGHT 600
+#define WINDOW_WIDTH XRES
+#define WINDOW_HEIGHT YRES
+#define VIEWPORT_WIDTH XRES
+#define VIEWPORT_HEIGHT YRES
 #endif
 
 void initIntro(GLuint program);
