@@ -11,6 +11,7 @@ extern WindowRenderer windowRenderer;
 #define VIEWPORT_WIDTH windowRenderer.viewportWidth
 #define VIEWPORT_HEIGHT windowRenderer.viewportHeight
 #else
+#include "generated/release_config.h"
 #define WINDOW_WIDTH XRES
 #define WINDOW_HEIGHT YRES
 #define VIEWPORT_WIDTH XRES
